@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { createConnection, type Socket } from "node:net";
 import { join } from "node:path";
+import { sessionKey, type SessionTarget } from "../shared/session-identity.js";
 
 export type DesktopConversation = {
   state: any;
@@ -14,8 +15,12 @@ type Options = {
     state: "connecting" | "connected" | "disconnected",
     message?: string,
   ) => void;
-  onConversation: (threadId: string, value: DesktopConversation) => void;
-  onUnavailable: (threadId: string) => void;
+  onConversation: (
+    threadId: string,
+    value: DesktopConversation,
+    hostId: string,
+  ) => void;
+  onUnavailable: (threadId: string, hostId: string) => void;
   socketPath?: string;
   retryMs?: number;
 };
@@ -36,7 +41,7 @@ export class DesktopIpc {
   private stopped = true;
   private clientId?: string;
   private retry?: ReturnType<typeof setTimeout>;
-  private watched = new Set<string>();
+  private watched = new Map<string, SessionTarget>();
   private conversations = new Map<string, DesktopConversation>();
   private pending = new Map<
     string,
@@ -61,7 +66,8 @@ export class DesktopIpc {
   stop() {
     this.stopped = true;
     clearTimeout(this.retry);
-    if (this.clientId) for (const id of this.watched) this.follow(id, false);
+    if (this.clientId)
+      for (const target of this.watched.values()) this.follow(target, false);
     const socket = this.socket;
     this.socket = undefined;
     this.clientId = undefined;
@@ -71,24 +77,50 @@ export class DesktopIpc {
   }
 
   /** 只保留调用方当前需要的对话，取消订阅后立即撤下旧确认状态。 */
-  watch(threadIds: string[]) {
-    const next = new Set(threadIds);
-    for (const id of this.watched)
-      if (!next.has(id)) {
-        this.follow(id, false);
-        this.invalidate(id);
+  watch(threadIds: (string | SessionTarget)[]) {
+    const next = new Map(
+      threadIds.map((value) => {
+        const target =
+          typeof value === "string"
+            ? { hostId: "local", threadId: value }
+            : value;
+        return [
+          sessionKey({ id: target.threadId, hostId: target.hostId }),
+          target,
+        ] as const;
+      }),
+    );
+    for (const [key, target] of this.watched)
+      if (!next.has(key)) {
+        this.follow(target, false);
+        this.invalidate(key);
       }
-    for (const id of next) if (!this.watched.has(id)) this.follow(id, true);
+    for (const [key, target] of next)
+      if (!this.watched.has(key)) this.follow(target, true);
     this.watched = next;
   }
 
-  get(threadId: string): DesktopConversation | undefined {
-    return this.conversations.get(threadId);
+  get(threadId: string, hostId = "local"): DesktopConversation | undefined {
+    return this.conversations.get(sessionKey({ id: threadId, hostId }));
   }
 
   /** 用户明确作答后才转给当前 owner；路由成功不代表原请求已完成。 */
-  requestOwner(threadId: string, method: string, params: object): Promise<any> {
-    const conversation = this.conversations.get(threadId);
+  requestOwner(
+    threadId: string,
+    method: string,
+    params: object,
+    hostId = "local",
+  ): Promise<any> {
+    // Never route remote operations, even if a caller supplies local-looking IDs.
+    const parameterHost = (params as { hostId?: unknown }).hostId;
+    if (
+      hostId !== "local" ||
+      (parameterHost !== undefined && parameterHost !== "local")
+    )
+      return Promise.reject(
+        new Error("SSH sessions are observation-only; actions are disabled."),
+      );
+    const conversation = this.get(threadId);
     if (!conversation || !this.clientId)
       return Promise.reject(
         new Error("该对话的桌面连接已失效，请刷新后重试。"),
@@ -132,7 +164,7 @@ export class DesktopIpc {
             throw new Error("Codex 桌面返回了无效的连接身份。");
           this.clientId = result.clientId;
           this.options.onState("connected");
-          for (const id of this.watched) this.follow(id, true);
+          for (const target of this.watched.values()) this.follow(target, true);
         })
         .catch(() => lose());
     });
@@ -208,14 +240,18 @@ export class DesktopIpc {
   }
 
   /** 只声明观察关系，不请求恢复对话，也不取得执行所有权。 */
-  private follow(threadId: string, following: boolean) {
+  private follow(target: SessionTarget, following: boolean) {
     if (!this.clientId) return;
     this.send({
       type: "broadcast",
       method: "thread-stream-following-changed",
       sourceClientId: this.clientId,
       version: 1,
-      params: { conversationId: threadId, hostId: "local", following },
+      params: {
+        conversationId: target.threadId,
+        hostId: target.hostId,
+        following,
+      },
     });
   }
 
@@ -254,38 +290,46 @@ export class DesktopIpc {
     }
     if (message.method === "ipc-connection-reset") {
       this.invalidateAll();
-      for (const id of this.watched) this.follow(id, true);
+      for (const target of this.watched.values()) this.follow(target, true);
       return;
     }
     if (message.method === "thread-stream-following-status-requested") {
       const { conversationId, hostId } = message.params ?? {};
-      if (
-        message.version === 1 &&
-        hostId === "local" &&
-        this.watched.has(conversationId)
-      )
-        this.follow(conversationId, true);
+      const target = this.watched.get(
+        sessionKey({ id: conversationId, hostId }),
+      );
+      if (message.version === 1 && typeof hostId === "string" && target)
+        this.follow(target, true);
       return;
     }
     if (message.method !== "thread-stream-state-changed") return;
     const { conversationId: id, hostId, change } = message.params ?? {};
-    if (hostId !== "local" || !this.watched.has(id)) return;
-    if (message.version !== 11)
+    if (typeof id !== "string" || typeof hostId !== "string") return;
+    const key = sessionKey({ id, hostId });
+    const target = this.watched.get(key);
+    if (!target) return;
+    if (message.version !== 11) {
+      // A remote protocol mismatch must not take local observation down.
+      if (hostId !== "local") {
+        this.invalidate(key);
+        return;
+      }
       throw new Error("unsupported-desktop-state-version");
+    }
     if (typeof message.sourceClientId !== "string") return;
-    const current = this.conversations.get(id);
+    const current = this.conversations.get(key);
     if (change?.type === "snapshot") {
       if (!change.conversationState || !Number.isInteger(change.revision))
         return;
       if (current && current.ownerClientId !== message.sourceClientId)
-        this.invalidate(id);
+        this.invalidate(key);
       const value = {
         state: change.conversationState,
         ownerClientId: message.sourceClientId,
         revision: change.revision,
       };
-      this.conversations.set(id, value);
-      this.options.onConversation(id, value);
+      this.conversations.set(key, value);
+      this.options.onConversation(id, value, hostId);
       return;
     }
     if (change?.type !== "patches" || !current) return;
@@ -296,27 +340,25 @@ export class DesktopIpc {
       !Number.isInteger(change.revision) ||
       change.revision <= current.revision
     ) {
-      this.invalidate(id);
-      this.follow(id, true);
+      this.invalidate(key);
+      this.follow(target, true);
       return;
     }
     try {
       current.state = applyPatches(current.state, change.patches);
       current.revision = change.revision;
-      this.options.onConversation(id, current);
+      this.options.onConversation(id, current, hostId);
     } catch {
-      this.invalidate(id);
-      this.follow(id, true);
+      this.invalidate(key);
+      this.follow(target, true);
     }
   }
 
-  private invalidate(threadId: string) {
-    if (this.conversations.delete(threadId))
-      this.options.onUnavailable(threadId);
-    this.rejectPending(
-      new Error("对话原窗口连接已失效，请刷新后重试。"),
-      threadId,
-    );
+  private invalidate(key: string) {
+    const target = this.watched.get(key);
+    if (this.conversations.delete(key) && target)
+      this.options.onUnavailable(target.threadId, target.hostId);
+    this.rejectPending(new Error("对话原窗口连接已失效，请刷新后重试。"), key);
   }
 
   private invalidateAll() {
@@ -338,6 +380,12 @@ function applyPatches(state: any, patches: any[]): any {
   if (!Array.isArray(patches)) throw new Error("invalid-desktop-patches");
   for (const { op, path, value } of patches) {
     if (!Array.isArray(path)) throw new Error("invalid-desktop-patch-path");
+    if (
+      path.some((key) =>
+        ["__proto__", "prototype", "constructor"].includes(key),
+      )
+    )
+      throw new Error("unsafe-desktop-patch-path");
     if (!path.length) {
       if (op !== "replace") throw new Error("invalid-desktop-root-patch");
       state = value;

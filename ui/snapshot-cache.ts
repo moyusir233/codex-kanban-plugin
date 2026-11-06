@@ -1,4 +1,5 @@
 import { columnFor, type Snapshot } from "../shared/types";
+import { isLocalSession, sessionKey } from "../shared/session-identity";
 
 export const SNAPSHOT_CACHE_KEY = "taskboard:last-snapshot";
 
@@ -9,7 +10,9 @@ export function cachedSnapshot(snapshot: Snapshot): Snapshot {
     cached: true,
     threads: snapshot.threads.map((thread) => ({
       ...thread,
-      cachedColumn: thread.cachedColumn ?? columnFor(thread),
+      cachedColumn: isLocalSession(thread)
+        ? (thread.cachedColumn ?? columnFor(thread))
+        : "unknown",
       fresh: false,
       pendingUserInput: false,
       waitingQuestion: null,
@@ -32,15 +35,33 @@ export function reconcileSnapshot(
   next: Snapshot,
 ): Snapshot {
   if (!previous) return next;
-  if (!next.sources.metadata && previous.threads.length)
-    return cachedSnapshot({ ...next, threads: previous.threads });
+  if (!next.sources.metadata && previous.threads.length) {
+    if (next.threads.every(isLocalSession))
+      return cachedSnapshot({ ...next, threads: previous.threads });
+    // Local storage failure must not hide verified SSH data or discard local cache.
+    const local = cachedSnapshot({
+      ...next,
+      threads: previous.threads.filter(isLocalSession),
+    });
+    return {
+      ...next,
+      cached: true,
+      threads: [
+        ...local.threads,
+        ...next.threads.filter((thread) => !isLocalSession(thread)),
+      ],
+    };
+  }
   // 成功读到空目录代表对话已清空，不能让旧列表永久留在页面。
   if (!next.threads.length) return next;
-  const known = new Map(previous.threads.map((thread) => [thread.id, thread]));
+  const known = new Map(
+    previous.threads.map((thread) => [sessionKey(thread), thread]),
+  );
   const threads: Snapshot["threads"] = next.threads.map((thread) => {
     const { cachedColumn: _cached, ...current } = thread;
     if (thread.fresh || thread.runtime?.type === "notLoaded") return current;
-    const old = known.get(thread.id);
+    if (!isLocalSession(thread)) return current;
+    const old = known.get(sessionKey(thread));
     const column =
       old?.cachedColumn ?? (old?.fresh ? columnFor(old) : "unknown");
     if (!old || column === "unknown") return current;
@@ -56,7 +77,9 @@ export function reconcileSnapshot(
     };
   });
   const freshIds = new Set(
-    next.threads.filter((thread) => thread.fresh).map((thread) => thread.id),
+    next.threads
+      .filter((thread) => thread.fresh && isLocalSession(thread))
+      .map((thread) => thread.id),
   );
   return {
     ...next,
@@ -101,6 +124,8 @@ function validSnapshot(value: unknown): value is Snapshot {
       (thread) =>
         !!thread &&
         typeof thread.id === "string" &&
+        (thread.hostId === undefined ||
+          (typeof thread.hostId === "string" && thread.hostId.length > 0)) &&
         typeof thread.title === "string" &&
         typeof thread.cwd === "string" &&
         typeof thread.project === "string" &&

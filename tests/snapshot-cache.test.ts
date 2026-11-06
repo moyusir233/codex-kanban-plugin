@@ -382,3 +382,42 @@ test("reconciliation retains only newly verified confirmation requests, never th
   next.confirmations = undefined;
   assert.equal(reconcileSnapshot(previous, next).confirmations, undefined);
 });
+
+test("equal IDs on local and SSH hosts never share cached runtime or confirmations", () => {
+  const previous = snapshot();
+  previous.threads[0].runtime = { type: "active" };
+  const next = snapshot();
+  next.threads[0] = {
+    ...next.threads[0],
+    hostId: "fixture-ssh",
+    fresh: false,
+    runtime: null,
+    pendingUserInput: false,
+  };
+  const merged = reconcileSnapshot(previous, next);
+  assert.equal(merged.threads[0].runtime, null);
+  assert.equal(columnFor(merged.threads[0]), "unknown");
+  assert.deepEqual(merged.confirmations?.requests, []);
+  next.threads[0].fresh = true;
+  next.threads[0].runtime = { type: "active" };
+  assert.equal(columnFor(cachedSnapshot(next).threads[0]), "unknown");
+});
+
+test("local metadata failure retains cached local cards without masking a fresh SSH card", () => {
+  const previous = snapshot();
+  const next = snapshot();
+  next.sources.metadata = false;
+  next.threads[0] = {
+    ...next.threads[0],
+    hostId: "fixture-ssh",
+    runtime: { type: "idle" },
+    pendingUserInput: false,
+  };
+  const merged = reconcileSnapshot(previous, next);
+  assert.equal(merged.threads.length, 2);
+  assert.equal(merged.threads[0].hostId, undefined);
+  assert.equal(merged.threads[0].fresh, false);
+  assert.equal(merged.threads[1].hostId, "fixture-ssh");
+  assert.equal(merged.threads[1].fresh, true);
+  assert.equal(columnFor(merged.threads[1]), "idle");
+});

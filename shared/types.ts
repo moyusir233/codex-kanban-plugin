@@ -30,6 +30,10 @@ export type ThreadLink = { id: string; title: string };
 export type GitMetadata = { branch: string | null; isWorktree: boolean };
 export type Thread = {
   id: string;
+  /** Omitted for legacy local sessions; remote IDs are scoped to this host. */
+  hostId?: string;
+  /** Remote sessions in this fork are observation-only. */
+  observationOnly?: boolean;
   title: string;
   cwd: string;
   project: string;

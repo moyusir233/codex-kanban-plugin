@@ -87,6 +87,7 @@ import {
   writeSnapshotCache,
 } from "./snapshot-cache";
 import "./style.css";
+import { isLocalSession, sessionKey } from "../shared/session-identity";
 
 const columns: {
   id: BoardColumn;
@@ -373,7 +374,10 @@ function Board() {
   );
   // 看板统计和项目选项也只包含普通对话。
   const boardThreads = useMemo(
-    () => threads.filter((thread) => thread.kind === "user"),
+    () =>
+      threads.filter(
+        (thread) => thread.kind === "user" || !isLocalSession(thread),
+      ),
     [threads],
   );
   const itemsByThread = useMemo(() => {
@@ -394,12 +398,14 @@ function Board() {
             matchesQuery(
               thread,
               query,
-              itemsByThread.get(thread.id)?.map((item) => item.title),
+              isLocalSession(thread)
+                ? itemsByThread.get(thread.id)?.map((item) => item.title)
+                : undefined,
             ),
         )
         .sort(compareByLastUserMessage)
         .slice(0, 15)
-        .map((thread) => thread.id),
+        .map(sessionKey),
     [boardThreads, filters.project, query, itemsByThread],
   );
   candidatesRef.current = candidates;
@@ -411,7 +417,9 @@ function Board() {
           matchesQuery(
             thread,
             query,
-            itemsByThread.get(thread.id)?.map((item) => item.title),
+            isLocalSession(thread)
+              ? itemsByThread.get(thread.id)?.map((item) => item.title)
+              : undefined,
           ),
       ),
     [boardThreads, filters, query, itemsByThread],
@@ -447,7 +455,10 @@ function Board() {
   );
   // 相同对话集合共用一次批量读取，不随运行状态轮询或排序重启。
   const artifactThreadKey = JSON.stringify(
-    displayed.map((thread) => thread.id).sort(),
+    displayed
+      .filter(isLocalSession)
+      .map((thread) => thread.id)
+      .sort(),
   );
   const observationQueryKey = JSON.stringify({ filters, query, sort });
   const hasSnapshot = snapshot !== null;
@@ -530,7 +541,7 @@ function Board() {
   };
   const open = async (thread: Thread) => {
     try {
-      await openConversation(thread.id);
+      await openConversation(thread.id, thread.hostId);
     } catch (e) {
       setToast((e as Error).message);
     }
@@ -920,7 +931,7 @@ function Board() {
         >
           <WorkItems
             active={view === "items"}
-            threads={boardThreads}
+            threads={boardThreads.filter(isLocalSession)}
             artifactRevision={artifactRevision}
             onChanged={updateWorkspace}
             openItem={workItems.find((item) => item.id === openItemId) ?? null}
@@ -1083,15 +1094,18 @@ function ThreadCard({
 }: CardActions & { thread: Thread; compact?: boolean }) {
   const { language, locale, t } = useI18n();
   const state = columnFor(thread);
+  const local = isLocalSession(thread);
+  const key = sessionKey(thread);
   // 分离 HEAD 也保留 worktree 标识，避免把它显示成未知分支。
   const branchLabel = thread.git
     ? `${thread.git.isWorktree ? "worktree - " : ""}${thread.git.branch ?? "detached HEAD"}`
     : null;
-  const requests = thread.fresh
-    ? (confirmations?.requests.filter(
-        (request) => request.threadId === thread.id,
-      ) ?? [])
-    : [];
+  const requests =
+    local && thread.fresh
+      ? (confirmations?.requests.filter(
+          (request) => request.threadId === thread.id,
+        ) ?? [])
+      : [];
   const metrics = (
     <>
       <span className="card-model-info">
@@ -1153,17 +1167,21 @@ function ThreadCard({
   return (
     <article
       className={`thread-card ${compact ? "is-compact" : ""}`}
-      data-thread-id={thread.id}
+      data-thread-id={key}
     >
       <button
         className="thread-card-open"
         onClick={() => onOpen(thread)}
+        disabled={!local}
         title={t("打开对话：{title}", { title: thread.title })}
         aria-label={t("打开对话：{title}", { title: thread.title })}
-        aria-describedby={`thread-context-${thread.id} thread-input-${thread.id}`}
+        aria-describedby={`thread-context-${key} thread-input-${key}`}
       >
         <span className="card-top">
-          <span className="card-context" id={`thread-context-${thread.id}`}>
+          <span className="card-context" id={`thread-context-${key}`}>
+            {!local && (
+              <span className="card-branch">{thread.hostId} · Read-only</span>
+            )}
             <span className="card-project" title={thread.cwd}>
               <Folder size={12} aria-hidden="true" />
               <span>{thread.project}</span>
@@ -1235,7 +1253,7 @@ function ThreadCard({
                 ? t("最近一轮输入")
                 : t("上轮输入")}
           </span>
-          <span className="card-input-text" id={`thread-input-${thread.id}`}>
+          <span className="card-input-text" id={`thread-input-${key}`}>
             {thread.turnUsage?.userInput === ""
               ? t("未输入文字")
               : (thread.turnUsage?.userInput ?? t("未获取到用户输入"))}
@@ -1278,42 +1296,45 @@ function ThreadCard({
           )}
         </p>
       )}
-      <ThreadMonitoring thread={thread} onError={onArtifactError} />
+      {local && <ThreadMonitoring thread={thread} onError={onArtifactError} />}
       {compact && (
         <details className="card-run-details">
           <summary>{t("运行详情")}</summary>
           {metrics}
         </details>
       )}
-      {(artifactsByThread.has(thread.id) ||
-        pendingArtifacts.has(thread.id)) && (
-        <div
-          className="card-artifacts"
-          aria-busy={pendingArtifacts.has(thread.id)}
-        >
-          <span className="card-artifacts-label">{t("成果")}</span>
-          <DetectedArtifacts
-            artifacts={artifactsByThread.get(thread.id) ?? []}
-            threads={[thread]}
-            showSource={false}
-            onError={onArtifactError}
-          />
-          {pendingArtifacts.has(thread.id) && (
-            <ThinkingLoader
-              phases={[t("正在识别成果…")]}
-              phase={0}
-              size="sm"
-              variant="plain"
+      {local &&
+        (artifactsByThread.has(thread.id) ||
+          pendingArtifacts.has(thread.id)) && (
+          <div
+            className="card-artifacts"
+            aria-busy={pendingArtifacts.has(thread.id)}
+          >
+            <span className="card-artifacts-label">{t("成果")}</span>
+            <DetectedArtifacts
+              artifacts={artifactsByThread.get(thread.id) ?? []}
+              threads={[thread]}
+              showSource={false}
+              onError={onArtifactError}
             />
-          )}
-        </div>
+            {pendingArtifacts.has(thread.id) && (
+              <ThinkingLoader
+                phases={[t("正在识别成果…")]}
+                phase={0}
+                size="sm"
+                variant="plain"
+              />
+            )}
+          </div>
+        )}
+      {local && (
+        <ThreadWorkItems
+          thread={thread}
+          items={workItems}
+          onAdd={() => onAddItem(thread)}
+          onOpenItem={onOpenItem}
+        />
       )}
-      <ThreadWorkItems
-        thread={thread}
-        items={workItems}
-        onAdd={() => onAddItem(thread)}
-        onOpenItem={onOpenItem}
-      />
     </article>
   );
 }
@@ -1325,19 +1346,16 @@ function ConversationList({
 }: CardActions & { threads: Thread[] }) {
   const { t } = useI18n();
   const [limit, setLimit] = useState(40);
-  useEffect(
-    () => setLimit(40),
-    [
-      threads
-        .map((thread) => thread.id)
-        .sort()
-        .join("|"),
-    ],
-  );
+  useEffect(() => setLimit(40), [threads.map(sessionKey).sort().join("|")]);
   return (
     <div className="conversation-list">
       {threads.slice(0, limit).map((thread) => (
-        <ThreadCard key={thread.id} thread={thread} compact {...cardActions} />
+        <ThreadCard
+          key={sessionKey(thread)}
+          thread={thread}
+          compact
+          {...cardActions}
+        />
       ))}
       {threads.length > limit && (
         <button
@@ -1383,7 +1401,11 @@ function Lane({
       </div>
       <div className="lane-cards">
         {threads.slice(0, limit).map((thread) => (
-          <ThreadCard key={thread.id} thread={thread} {...cardActions} />
+          <ThreadCard
+            key={sessionKey(thread)}
+            thread={thread}
+            {...cardActions}
+          />
         ))}
         {!threads.length && (
           <div className="lane-empty">

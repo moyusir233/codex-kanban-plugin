@@ -8,7 +8,7 @@ import { DatabaseSync } from "node:sqlite";
 import { StatusBridge } from "../server/status-bridge";
 import { columnFor } from "../shared/types";
 
-const id = "00000000-0000-0000-0000-000000000001";
+const id = "00000000-0000-4000-8000-000000000001";
 const owner = "original-desktop-window";
 
 async function until(check: () => Promise<boolean>) {
@@ -20,7 +20,7 @@ async function until(check: () => Promise<boolean>) {
 }
 
 /** 以隔离桌面 socket 验证默认接入，不启动 Codex、不执行回合或真实审批。 */
-async function fixture() {
+async function fixture(sshSessions?: string) {
   const home = await mkdtemp(join(tmpdir(), "kanban-desktop-state-"));
   await mkdir(join(home, "ipc"));
   const database = new DatabaseSync(join(home, "state_5.sqlite"));
@@ -54,7 +54,7 @@ async function fixture() {
     header.writeUInt32LE(data.length);
     socket.write(Buffer.concat([header, data]));
   };
-  const snapshot = (next: any = state) => {
+  const snapshot = (next: any = state, hostId = "local") => {
     state = next;
     send({
       type: "broadcast",
@@ -62,7 +62,7 @@ async function fixture() {
       version: 11,
       sourceClientId: owner,
       params: {
-        hostId: "local",
+        hostId,
         conversationId: id,
         change: {
           type: "snapshot",
@@ -103,7 +103,7 @@ async function fixture() {
   await new Promise<void>((ok) =>
     server.listen(join(home, "ipc", "ipc.sock"), ok),
   );
-  const bridge = new StatusBridge({ home });
+  const bridge = new StatusBridge({ home, sshSessions });
   bridge.start();
   return {
     bridge,
@@ -471,3 +471,77 @@ for (const status of ["completed", "interrupted", "failed"]) {
     }
   });
 }
+
+test("explicit SSH targets stay unknown until observed and never enter local enrichment or approvals", async () => {
+  const hostId = "fixture-remote";
+  const f = await fixture(JSON.stringify([{ hostId, threadId: id }]));
+  const readCwds: string[] = [];
+  (f.bridge as any).gitMetadata = {
+    read: async (cwd: string) => {
+      readCwds.push(cwd);
+      return null;
+    },
+  };
+  const remote = async () =>
+    (await f.bridge.snapshot()).threads.find(
+      (thread) => thread.hostId === hostId,
+    )!;
+  try {
+    const initial = await f.bridge.open();
+    assert.equal(
+      columnFor(initial.threads.find((thread) => thread.hostId === hostId)!),
+      "unknown",
+    );
+    await until(async () =>
+      f.messages.some((m) => m.params?.hostId === hostId && m.params.following),
+    );
+    f.snapshot(
+      {
+        ...f.state(),
+        title: "Remote only",
+        cwd: "/REMOTE_PATH_MUST_NOT_BE_READ",
+        threadRuntimeStatus: {
+          type: "active",
+          activeFlags: ["waitingOnApproval"],
+        },
+        requests: [
+          {
+            id: 99,
+            method: "item/commandExecution/requestApproval",
+            params: { threadId: id, command: "PRIVATE_REMOTE_COMMAND" },
+          },
+        ],
+      },
+      hostId,
+    );
+    await until(async () => (await remote()).fresh);
+    const data = await f.bridge.snapshot();
+    assert.equal(data.threads.length, 2);
+    assert.equal(
+      data.threads.find((thread) => !thread.hostId)?.title,
+      "本地对话",
+    );
+    assert.equal(columnFor(await remote()), "waiting");
+    assert.equal((await remote()).observationOnly, true);
+    assert.equal((await remote()).git, null);
+    assert.equal((await remote()).lastUserMessageAt, null);
+    assert.equal((await remote()).goalStatus, "active");
+    assert.deepEqual(data.confirmations?.requests, []);
+    assert.ok(!readCwds.includes("/REMOTE_PATH_MUST_NOT_BE_READ"));
+    assert.ok(!JSON.stringify(data).includes("PRIVATE_REMOTE_COMMAND"));
+    await f.bridge.snapshot(null, [id]);
+    assert.equal((await remote()).fresh, false);
+    assert.equal(columnFor(await remote()), "unknown");
+    assert.equal((await remote()).runtime, null);
+    assert.deepEqual(
+      [
+        ...new Set(
+          f.messages.filter((m) => m.type === "request").map((m) => m.method),
+        ),
+      ],
+      ["initialize"],
+    );
+  } finally {
+    await f.close();
+  }
+});

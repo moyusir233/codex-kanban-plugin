@@ -485,3 +485,206 @@ test("incompatible state versions fail visibly instead of presenting stale state
     await f.close();
   }
 });
+
+const remoteHost = "fixture-ssh-host";
+
+test("SSH subscriptions isolate equal thread IDs, ignore unsolicited hosts, and never route actions", async () => {
+  const f = await fixture();
+  try {
+    f.client.watch([thread, { hostId: remoteHost, threadId: thread }]);
+    f.client.start();
+    await until(
+      () => f.messages.filter((m) => m.params?.following === true).length === 2,
+    );
+    f.snapshot({ title: "local" });
+    const remoteSnapshot = (hostId = remoteHost, version = 11) =>
+      f.send({
+        type: "broadcast",
+        method: "thread-stream-state-changed",
+        sourceClientId: "remote-owner",
+        version,
+        params: {
+          hostId,
+          conversationId: thread,
+          change: {
+            type: "snapshot",
+            revision: 1,
+            conversationState: { title: "remote" },
+          },
+        },
+      });
+    remoteSnapshot();
+    await until(
+      () => !!f.client.get(thread, remoteHost) && !!f.client.get(thread),
+    );
+    assert.equal(f.client.get(thread)?.state.title, "local");
+    assert.equal(f.client.get(thread, remoteHost)?.state.title, "remote");
+    remoteSnapshot("unwatched-host");
+    await new Promise((ok) => setTimeout(ok, 20));
+    assert.equal(f.client.get(thread, "unwatched-host"), undefined);
+    for (const method of [
+      "thread-follower-command-approval-decision",
+      "thread-follower-start-turn",
+      "thread-follower-steer-turn",
+      "thread/resume",
+      "command/exec",
+    ]) {
+      await assert.rejects(
+        f.client.requestOwner(thread, method, {}, remoteHost),
+        /observation-only/,
+      );
+      await assert.rejects(
+        f.client.requestOwner(thread, method, { hostId: remoteHost }),
+        /observation-only/,
+      );
+    }
+    f.send({
+      type: "broadcast",
+      method: "thread-stream-state-changed",
+      sourceClientId: "remote-owner",
+      version: 11,
+      params: {
+        hostId: remoteHost,
+        conversationId: thread,
+        change: {
+          type: "patches",
+          baseRevision: 1,
+          revision: 2,
+          patches: [{ op: "replace", path: ["title"], value: "remote patch" }],
+        },
+      },
+    });
+    await until(() => f.client.get(thread, remoteHost)?.revision === 2);
+    assert.equal(f.client.get(thread)?.state.title, "local");
+    remoteSnapshot(remoteHost, 12);
+    await until(() => !f.client.get(thread, remoteHost));
+    assert.ok(f.client.get(thread));
+    assert.equal(f.connectionStates.at(-1)?.state, "connected");
+    remoteSnapshot();
+    await until(() => !!f.client.get(thread, remoteHost));
+    f.client.watch([thread]);
+    await until(() =>
+      f.messages.some(
+        (m) => m.params?.hostId === remoteHost && m.params.following === false,
+      ),
+    );
+    assert.equal(f.client.get(thread, remoteHost), undefined);
+    assert.ok(f.client.get(thread));
+    assert.ok(
+      f.messages
+        .filter((m) => m.type === "request")
+        .every((m) => m.method === "initialize"),
+    );
+  } finally {
+    await f.close();
+  }
+});
+
+test("remote revision gaps and owner disconnects invalidate only their host/thread pair", async () => {
+  const f = await fixture();
+  try {
+    f.client.watch([
+      thread,
+      { hostId: remoteHost, threadId: thread },
+      { hostId: "second-host", threadId: thread },
+    ]);
+    f.client.start();
+    await until(
+      () => f.messages.filter((m) => m.params?.following === true).length === 3,
+    );
+    f.snapshot({ title: "local" });
+    for (const hostId of [remoteHost, "second-host"])
+      f.send({
+        type: "broadcast",
+        method: "thread-stream-state-changed",
+        version: 11,
+        sourceClientId: hostId,
+        params: {
+          hostId,
+          conversationId: thread,
+          change: {
+            type: "snapshot",
+            revision: 1,
+            conversationState: { title: hostId },
+          },
+        },
+      });
+    await until(
+      () =>
+        !!f.client.get(thread, remoteHost) &&
+        !!f.client.get(thread, "second-host"),
+    );
+    f.send({
+      type: "broadcast",
+      method: "thread-stream-state-changed",
+      version: 11,
+      sourceClientId: remoteHost,
+      params: {
+        hostId: remoteHost,
+        conversationId: thread,
+        change: { type: "patches", baseRevision: 2, revision: 3, patches: [] },
+      },
+    });
+    await until(() => !f.client.get(thread, remoteHost));
+    assert.ok(f.client.get(thread));
+    assert.ok(f.client.get(thread, "second-host"));
+    await until(
+      () =>
+        f.messages.filter(
+          (m) => m.params?.hostId === remoteHost && m.params.following,
+        ).length === 2,
+    );
+    f.send({
+      type: "broadcast",
+      method: "client-status-changed",
+      params: { clientId: "second-host", status: "disconnected" },
+    });
+    await until(() => !f.client.get(thread, "second-host"));
+    assert.ok(f.client.get(thread));
+  } finally {
+    await f.close();
+  }
+});
+
+test("remote patches cannot traverse prototype properties", async () => {
+  const f = await fixture();
+  try {
+    f.client.watch([{ hostId: remoteHost, threadId: thread }]);
+    f.client.start();
+    await until(() => f.messages.some((m) => m.params?.following));
+    f.send({
+      type: "broadcast",
+      method: "thread-stream-state-changed",
+      version: 11,
+      sourceClientId: "remote-owner",
+      params: {
+        hostId: remoteHost,
+        conversationId: thread,
+        change: { type: "snapshot", revision: 1, conversationState: {} },
+      },
+    });
+    await until(() => !!f.client.get(thread, remoteHost));
+    f.send({
+      type: "broadcast",
+      method: "thread-stream-state-changed",
+      version: 11,
+      sourceClientId: "remote-owner",
+      params: {
+        hostId: remoteHost,
+        conversationId: thread,
+        change: {
+          type: "patches",
+          baseRevision: 1,
+          revision: 2,
+          patches: [
+            { op: "add", path: ["__proto__", "kanbanPolluted"], value: true },
+          ],
+        },
+      },
+    });
+    await until(() => !f.client.get(thread, remoteHost));
+    assert.equal(({} as any).kanbanPolluted, undefined);
+  } finally {
+    await f.close();
+  }
+});

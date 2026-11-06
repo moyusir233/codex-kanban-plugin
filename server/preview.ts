@@ -111,7 +111,7 @@ const server = createServer(async (req, res) => {
               ids.length > 500 ||
               !ids.every(
                 (id: unknown) =>
-                  typeof id === "string" && id.length > 0 && id.length <= 200,
+                  typeof id === "string" && id.length > 0 && id.length <= 2000,
               )))
         ) {
           res.writeHead(400).end();

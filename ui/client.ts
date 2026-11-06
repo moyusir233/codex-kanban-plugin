@@ -15,6 +15,7 @@ import type {
 } from "../shared/work-items";
 import type { WorkReview, WorkReviewOptions } from "../shared/work-review";
 import { cachedSnapshot } from "./snapshot-cache";
+import { isLocalSession } from "../shared/session-identity";
 
 let app: App | null = null;
 let extensions: OpenAIExtensions | null = null;
@@ -111,7 +112,11 @@ export async function readSnapshot(
   if (!validSnapshot(value)) throw new Error("收到的状态数据格式不受支持");
   return value;
 }
-export async function openConversation(id: string) {
+export async function openConversation(id: string, hostId?: string) {
+  if (!isLocalSession({ hostId }))
+    throw new Error(
+      "SSH session navigation is unverified. Open it in Codex Desktop.",
+    );
   if (!/^[0-9a-f-]{36}$/i.test(id)) throw new Error("对话 ID 格式无效");
   const url = `codex://threads/${id}`;
   if (app) {

@@ -149,7 +149,7 @@ const handle = serveStdio(
         inputSchema: z.object({
           unreadSelection: z.string().max(400).nullable().optional(),
           observedThreadIds: z
-            .array(z.string().min(1).max(200))
+            .array(z.string().min(1).max(2000))
             .max(500)
             .optional(),
         }),

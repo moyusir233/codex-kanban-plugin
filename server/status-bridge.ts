@@ -4,6 +4,8 @@ import { readLocalData } from "./local-data.js";
 import { GitMetadataReader } from "./git-metadata.js";
 import { DesktopIpc, type DesktopConversation } from "./desktop-ipc.js";
 import { DesktopConfirmations } from "./desktop-confirmations.js";
+import { sshSessionTargets, sshSessionThread } from "./ssh-sessions.js";
+import { sessionKey } from "../shared/session-identity.js";
 import { readConfirmations, replyToConfirmation } from "./confirmations.js";
 import type { ConfirmationReply } from "../shared/confirmations.js";
 import {
@@ -86,8 +88,14 @@ export class StatusBridge {
   private initialSyncComplete = false;
   readonly endpoint: string;
   readonly home: string;
+  private readonly sshTargets;
 
-  constructor(options: { endpoint?: string; home?: string } = {}) {
+  constructor(
+    options: { endpoint?: string; home?: string; sshSessions?: string } = {},
+  ) {
+    this.sshTargets = sshSessionTargets(
+      options.sshSessions ?? process.env.TASKBOARD_SSH_SESSIONS,
+    );
     this.home = options.home ?? process.env.CODEX_HOME ?? `${homedir()}/.codex`;
     const websocket = options.endpoint ?? process.env.TASKBOARD_WS_URL;
     this.endpoint = websocket
@@ -106,8 +114,11 @@ export class StatusBridge {
           this.state(state, message ?? null);
           if (state === "connected") this.initialSyncComplete = true;
         },
-        onConversation: (id, value) => this.rememberDesktop(id, value),
-        onUnavailable: (id) => {
+        onConversation: (id, value, hostId) => {
+          if (hostId === "local") this.rememberDesktop(id, value);
+        },
+        onUnavailable: (id, hostId) => {
+          if (hostId !== "local") return;
           this.userInput.delete(id);
           this.modes.delete(id);
           const runtime = this.runtime.get(id);
@@ -136,7 +147,18 @@ export class StatusBridge {
   /** UI 心跳续租当前观察集合，宿主直接销毁面板后也会自动退订。 */
   private observeDesktop(threadIds: string[]) {
     if (!this.desktop) return;
-    this.desktop.watch(threadIds);
+    // Remote keys are accepted only from the explicit configuration allowlist.
+    const remote = new Map(
+      this.sshTargets.map((target) => [
+        sessionKey({ id: target.threadId, hostId: target.hostId }),
+        target,
+      ]),
+    );
+    this.desktop.watch(
+      threadIds
+        .filter((id) => !id.startsWith("ssh:") || remote.has(id))
+        .map((id) => remote.get(id) ?? id),
+    );
     clearTimeout(this.observationLease);
     if (threadIds.length) {
       this.observationLease = setTimeout(() => this.desktop?.watch([]), 15000);
@@ -551,12 +573,16 @@ export class StatusBridge {
     this.initialSyncRequested = true;
     const data = await this.snapshot(selection, observedThreadIds);
     if (this.desktop && observedThreadIds === undefined)
-      this.observeDesktop(
-        data.threads
+      this.observeDesktop([
+        ...data.threads
+          .filter((thread) => thread.hostId === undefined)
           .filter((thread) => thread.kind === "user")
           .slice(0, 15)
           .map((thread) => thread.id),
-      );
+        ...this.sshTargets.map((target) =>
+          sessionKey({ id: target.threadId, hostId: target.hostId }),
+        ),
+      ]);
     else this.beginInitialSync();
     return data;
   }
@@ -710,7 +736,18 @@ export class StatusBridge {
         this.initialSyncRequested &&
         !this.initialSyncComplete &&
         this.connection.state !== "disconnected",
-      threads: [...threads.values()].sort(compareByLastUserMessage),
+      // Append remote display data only after all local filesystem enrichment.
+      threads: [
+        ...threads.values(),
+        ...this.sshTargets.map((target) =>
+          sshSessionThread(
+            target,
+            this.connection.state === "connected"
+              ? this.desktop?.get(target.threadId, target.hostId)
+              : undefined,
+          ),
+        ),
+      ].sort(compareByLastUserMessage),
       confirmations,
       connection: { ...this.connection },
       sources: {

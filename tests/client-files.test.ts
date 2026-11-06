@@ -226,3 +226,17 @@ test("host-provided list restores immediately even when the view registers obser
     assert.deepEqual(externalCalls, ["callTool:taskboard_snapshot"]);
   });
 });
+
+test("remote conversation navigation fails closed before any host action", async () => {
+  await hostFixture(true, async (client, opened, calls) => {
+    await assert.rejects(
+      client.openConversation(
+        "00000000-0000-4000-8000-000000000001",
+        "fixture-ssh",
+      ),
+      /navigation is unverified/,
+    );
+    assert.deepEqual(opened, []);
+    assert.deepEqual(calls, []);
+  });
+});
