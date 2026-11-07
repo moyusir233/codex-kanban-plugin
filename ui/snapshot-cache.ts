@@ -15,6 +15,9 @@ export function cachedSnapshot(snapshot: Snapshot): Snapshot {
         : "unknown",
       fresh: false,
       ...(!isLocalSession(thread)
+        ? { remoteActionsEnabled: false, observationOnly: true }
+        : {}),
+      ...(!isLocalSession(thread)
         ? { runtime: null, runtimeAt: null, error: null, unread: null }
         : {}),
       pendingUserInput: false,
@@ -80,6 +83,8 @@ export function reconcileSnapshot(
         error: null,
         unread: null,
         fresh: false,
+        remoteActionsEnabled: false,
+        observationOnly: true,
         pendingUserInput: false,
         waitingSince: null,
         waitingQuestion: null,
@@ -104,8 +109,12 @@ export function reconcileSnapshot(
   });
   const freshIds = new Set(
     next.threads
-      .filter((thread) => thread.fresh && isLocalSession(thread))
-      .map((thread) => thread.id),
+      .filter(
+        (thread) =>
+          thread.fresh &&
+          (isLocalSession(thread) || thread.remoteActionsEnabled === true),
+      )
+      .map(sessionKey),
   );
   return {
     ...next,
@@ -116,7 +125,9 @@ export function reconcileSnapshot(
       ? {
           ...next.confirmations,
           requests: next.confirmations.requests.filter((request) =>
-            freshIds.has(request.threadId),
+            freshIds.has(
+              sessionKey({ id: request.threadId, hostId: request.hostId }),
+            ),
           ),
         }
       : undefined,

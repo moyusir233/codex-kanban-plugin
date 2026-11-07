@@ -31,12 +31,18 @@ function frame(message: object) {
   return Buffer.concat([header, body]);
 }
 
-for (const packaged of [false, true]) {
+for (const { packaged, actions } of [
+  { packaged: false, actions: false },
+  { packaged: true, actions: false },
+  { packaged: false, actions: true },
+  { packaged: true, actions: true },
+]) {
   test(
     (packaged ? "repository distribution" : "source build") +
-      " MCP/UI observes SSH through filtered reconnects and host-safe collections",
+      " MCP/UI observes SSH through filtered reconnects and host-safe collections; actions=" +
+      actions,
     { timeout: 60000 },
-    async () => {
+    async (t) => {
       const home = await mkdtemp(join(tmpdir(), "kanban-ssh-ui-"));
       const codexHome = join(home, "codex");
       await mkdir(join(codexHome, "ipc"), { recursive: true });
@@ -156,6 +162,47 @@ for (const packaged of [false, true]) {
                   result: { clientId: "ui-observer" },
                 }),
               );
+            if (message.method === "thread-owner-discovery") {
+              assert.ok(actions);
+              assert.equal(message.version, 1);
+              assert.equal(message.params.hostId, hostId);
+              assert.equal(message.params.conversationId, id);
+              socket.write(
+                frame({
+                  type: "response",
+                  requestId: message.requestId,
+                  resultType: "success",
+                  method: message.method,
+                  handledByClientId: "owner-" + hostId,
+                  result: { supportsUntrustedAppInput: true },
+                }),
+              );
+            }
+            if (
+              message.method === "thread-follower-command-approval-decision"
+            ) {
+              assert.ok(actions);
+              assert.equal(message.hostId, hostId);
+              assert.equal(message.version, 2);
+              assert.deepEqual(message.params, {
+                conversationId: id,
+                requestId: 0,
+                decision: "decline",
+              });
+              assert.equal(message.targetClientId, "owner-" + hostId);
+              states.get(remoteKey).requests = [];
+              socket.write(
+                frame({
+                  type: "response",
+                  requestId: message.requestId,
+                  resultType: "success",
+                  method: message.method,
+                  handledByClientId: "owner-" + hostId,
+                  result: { ok: true },
+                }),
+              );
+              sendSnapshot(socket, id, hostId);
+            }
             if (
               respondToFollows &&
               message.method === "thread-stream-following-changed" &&
@@ -192,6 +239,10 @@ for (const packaged of [false, true]) {
           { hostId, threadId: agentId },
         ]),
       };
+      if (actions)
+        supplied.TASKBOARD_SSH_ACTIONS = JSON.stringify([
+          { hostId, threadId: id },
+        ]);
       // Model the executor allowlist; never hand-inject the opt-in into transport.env.
       const env: Record<string, string> = Object.fromEntries(
         config.env_vars
@@ -213,6 +264,7 @@ for (const packaged of [false, true]) {
           env.TASKBOARD_SSH_SESSIONS,
           supplied.TASKBOARD_SSH_SESSIONS,
         );
+        assert.equal(env.TASKBOARD_SSH_ACTIONS, supplied.TASKBOARD_SSH_ACTIONS);
         await client.connect(transport);
         await client.callTool({ name: "taskboard_open", arguments: {} });
         const readSnapshot = async () => {
@@ -307,6 +359,11 @@ for (const packaged of [false, true]) {
               name: "taskboard_snapshot",
               arguments: input,
             });
+          else if (path === "/api/confirmations/respond")
+            result = await client.callTool({
+              name: "taskboard_confirmation_reply",
+              arguments: input,
+            });
           else if (path === "/api/workspace")
             result = await client.callTool({
               name: "taskboard_workspace",
@@ -384,6 +441,59 @@ for (const packaged of [false, true]) {
           assert.ok(element, selector);
           element.click();
         };
+        // Exercise actual UI -> MCP -> host-routed owner transport, not just types.
+        states.get(remoteKey).requests = [
+          {
+            id: 0,
+            method: "item/commandExecution/requestApproval",
+            params: {
+              threadId: id,
+              turnId: "fixture-turn",
+              itemId: "fixture-item",
+              command: "fixture command NOT EXECUTED",
+              cwd: "/REMOTE_NOT_LOCAL",
+              availableDecisions: ["accept", "decline"],
+            },
+          },
+        ];
+        sendSnapshot(sockets.at(-1)!, id, hostId);
+        await until(
+          async () =>
+            (await readSnapshot()).threads.find(
+              (t) => t.hostId === hostId && t.id === id,
+            )?.remoteActionsEnabled === actions,
+        );
+        if (actions) {
+          await until(() => !!remoteCard().querySelector(".card-confirmation"));
+          assert.ok(
+            remoteCard()
+              .querySelector(".card-confirmation")!
+              .textContent?.includes(hostId),
+          );
+          assert.ok(
+            !cards()
+              .find((c) => c.dataset.threadId === id)!
+              .querySelector(".card-confirmation"),
+          );
+          [
+            ...remoteCard().querySelectorAll<HTMLButtonElement>(
+              ".confirmation-actions button",
+            ),
+          ]
+            .find((b) => b.textContent?.includes("Decline"))!
+            .click();
+          await until(() =>
+            messages.some(
+              (m) => m.method === "thread-follower-command-approval-decision",
+            ),
+          );
+          await until(() => !remoteCard().querySelector(".card-confirmation"));
+        } else {
+          assert.deepEqual((await readSnapshot()).confirmations?.requests, []);
+          assert.ok(!remoteCard().querySelector(".card-confirmation"));
+          states.get(remoteKey).requests = [];
+          sendSnapshot(sockets.at(-1)!, id, hostId);
+        }
         assert.equal(
           snapshot.threads.filter((thread) => thread.lastUserMessageAt).length,
           16,
@@ -424,15 +534,13 @@ for (const packaged of [false, true]) {
           .find((button) => button.textContent?.includes("Needs attention"))!
           .click();
         await until(() => !!remoteCard()?.closest(".lane--blue"));
-        sockets
-          .at(-1)!
-          .write(
-            frame({
-              type: "broadcast",
-              method: "client-status-changed",
-              params: { clientId: "owner-" + hostId, status: "disconnected" },
-            }),
-          );
+        sockets.at(-1)!.write(
+          frame({
+            type: "broadcast",
+            method: "client-status-changed",
+            params: { clientId: "owner-" + hostId, status: "disconnected" },
+          }),
+        );
         await until(() => cards().length === 0);
         const attentionLost = observations.length;
         await until(
@@ -484,8 +592,33 @@ for (const packaged of [false, true]) {
         setSearch("Fixture remote ordinary");
         await until(() => cards().length === 1);
         states.get(remoteKey).threadRuntimeStatus = { type: "idle" };
+        if (actions)
+          states.get(remoteKey).requests = [
+            {
+              id: 0,
+              method: "item/commandExecution/requestApproval",
+              params: {
+                threadId: id,
+                command: "fixture stale request NOT EXECUTED",
+                availableDecisions: ["decline"],
+              },
+            },
+          ];
         sendSnapshot(sockets.at(-1)!, id, hostId);
         await until(() => !!remoteCard().closest(".lane--gray"));
+        let staleReply: any;
+        if (actions) {
+          await until(() => !!remoteCard().querySelector(".card-confirmation"));
+          const pending = (await readSnapshot()).confirmations!.requests.find(
+            (r) => r.hostId === hostId,
+          )!;
+          staleReply = {
+            id: pending.id,
+            threadId: id,
+            hostId,
+            decision: "decline",
+          };
+        }
         sockets.at(-1)!.write(
           frame({
             type: "broadcast",
@@ -494,6 +627,36 @@ for (const packaged of [false, true]) {
           }),
         );
         await until(() => !!remoteCard()?.closest(".lane--muted"));
+        assert.ok(!remoteCard().querySelector(".card-confirmation"));
+        const disconnected = await readSnapshot();
+        assert.equal(
+          disconnected.threads.find((t) => t.hostId === hostId && t.id === id)
+            ?.remoteActionsEnabled,
+          false,
+        );
+        assert.deepEqual(disconnected.confirmations?.requests, []);
+        if (actions) {
+          t.diagnostic("remote stale reply: submitting after owner loss");
+          const before = messages.filter(
+            (m) => m.method === "thread-follower-command-approval-decision",
+          ).length;
+          const rejected = await client.callTool(
+            {
+              name: "taskboard_confirmation_reply",
+              arguments: staleReply,
+            },
+            undefined,
+            { timeout: 3000 },
+          );
+          t.diagnostic("remote stale reply: response received");
+          assert.ok(rejected.isError);
+          assert.equal(
+            messages.filter(
+              (m) => m.method === "thread-follower-command-approval-decision",
+            ).length,
+            before,
+          );
+        }
         assert.equal(
           columnFor(
             (await readSnapshot()).threads.find(
@@ -513,6 +676,8 @@ for (const packaged of [false, true]) {
             observations.at(-1)!.includes(remoteKey),
         );
         states.get(remoteKey).threadRuntimeStatus = { type: "active" };
+        delete states.get(remoteKey).requests;
+        t.diagnostic("remote stale reply: restoring snapshot");
         sendSnapshot(sockets.at(-1)!, id, hostId);
         await until(() => !!remoteCard()?.closest(".lane--green"));
         // Also exercise real transport disconnect/reconnect with held snapshots.
@@ -632,7 +797,17 @@ for (const packaged of [false, true]) {
         assert.ok(
           messages
             .filter((message) => message.type === "request")
-            .every((message) => message.method === "initialize"),
+            .every((message) =>
+              [
+                "initialize",
+                ...(actions
+                  ? [
+                      "thread-owner-discovery",
+                      "thread-follower-command-approval-decision",
+                    ]
+                  : []),
+              ].includes(message.method),
+            ),
         );
         assert.ok(
           messages.every(
@@ -642,6 +817,7 @@ for (const packaged of [false, true]) {
           ),
         );
       } finally {
+        t.diagnostic("closing isolated MCP/UI fixture");
         dom?.window.close();
         await client.close();
         for (const socket of sockets) socket.destroy();

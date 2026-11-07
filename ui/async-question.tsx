@@ -119,6 +119,9 @@ export function AsyncQuestionCard({
       <header className="async-question-header">
         <span className="async-question-heading">
           <CircleHelp size={14} aria-hidden="true" /> {t("问题")}
+          {request.hostId && request.hostId !== "local" && (
+            <span> · SSH · {request.hostId}</span>
+          )}
         </span>
         {dismissed ? (
           <button

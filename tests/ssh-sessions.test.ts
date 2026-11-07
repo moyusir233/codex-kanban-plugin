@@ -176,3 +176,19 @@ test("SSH display reuses known structured Desktop questions and turn failures, n
   assert.equal(lost.error, null);
   assert.equal(lost.runtime, null);
 });
+
+test("SSH actions require explicit registered pairs and never opt in implicitly", async () => {
+  const { sshActionTargets } = await import("../server/ssh-sessions");
+  assert.deepEqual(sshActionTargets(undefined, [target]), []);
+  assert.deepEqual(sshActionTargets(JSON.stringify([target]), [target]), [
+    target,
+  ]);
+  assert.throws(() => sshActionTargets(JSON.stringify([target]), []), /subset/);
+  assert.throws(
+    () =>
+      sshActionTargets(JSON.stringify([{ ...target, hostId: "another" }]), [
+        target,
+      ]),
+    /subset/,
+  );
+});

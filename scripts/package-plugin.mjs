@@ -20,6 +20,7 @@ for (const path of [
   "README.md",
   "README.zh.md",
   "SSH-SESSIONS.md",
+  "SSH-PROTOCOL-RESEARCH.md",
   "LICENSE",
 ]) {
   await cp(resolve(root, path), resolve(plugin, path), { recursive: true });

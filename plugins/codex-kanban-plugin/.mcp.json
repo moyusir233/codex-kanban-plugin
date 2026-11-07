@@ -11,12 +11,13 @@
         "PATH",
         "CODEX_HOME",
         "TASKBOARD_WS_URL",
-        "TASKBOARD_SSH_SESSIONS"
+        "TASKBOARD_SSH_SESSIONS",
+        "TASKBOARD_SSH_ACTIONS"
       ],
       "startup_timeout_sec": 180,
       "tool_timeout_sec": 60,
       "env": {
-        "TASKBOARD_BUILD_ID": "1cc5b2ec1882080040dc78095be1e1f6bf266e914d9cbe16cb2425aa0fd00c47"
+        "TASKBOARD_BUILD_ID": "93e0989f61e29b1a40e44a7d43e9d1705d73bd89d5197076d0b8bed005b78f62"
       }
     }
   }

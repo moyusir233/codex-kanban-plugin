@@ -1,4 +1,4 @@
-# SSH session observation (fork-only, experimental)
+# SSH sessions (fork-only, experimental)
 
 Base: `51a96afdbdd8d427c02bb03c4a0cabacc6ac0e25`.
 
@@ -12,7 +12,7 @@ Base: `51a96afdbdd8d427c02bb03c4a0cabacc6ac0e25`.
   supports `thread/list` (paginated stored threads), `thread/loaded/list`
   (in-memory IDs), and `thread/read` (metadata without resume). These belong
   to an app-server connection, not the desktop IPC router. This fork has no
-  verified host-routed transport to the desktop-owned SSH app-server.
+  verified host-routed read/list transport to the desktop-owned SSH app-server.
 - [Remote connection documentation](https://learn.chatgpt.com/docs/remote-connections#connect-to-an-ssh-host)
   describes desktop SSH alias discovery and starting a remote app-server over
   SSH. Aliases do not prove active connections or enumerate sessions. This
@@ -20,17 +20,16 @@ Base: `51a96afdbdd8d427c02bb03c4a0cabacc6ac0e25`.
 - IPC `client-discovery-request` is routing/capability discovery, not a session
   listing. The observer still answers `canHandle: false`. No guessed listing
   methods are sent. Automatic discovery remains unsupported, not simulated.
-- Rechecked the official app-server and remote-connection documentation for
-  this extension. `thread/read` does not resume/load a thread, but that fact
-  does not establish a route through Desktop's existing SSH connection. The
-  repository's observer exposes only following/snapshot messages; its owner
-  requests are local-only. No Desktop application bundle was available in
-  this Linux checkout for further static verification.
-- The existing local card opens `codex://threads/<id>` through the MCP host's
-  `openLink`. Neither available code nor the checked documentation establishes
-  a host-aware equivalent or its loaded/read effects. SSH card and collection
-  navigation therefore remain disabled with an explanation. No guessed links,
-  remote owner requests, or live navigation experiments were attempted.
+- Static analysis of the official public Desktop **26.1103.41825 / 25679**
+  bundle establishes a host-routed follower owner-action transport. Remote
+  follower requests use top-level `hostId` and the local method version plus
+  one. See [research evidence and provenance](SSH-PROTOCOL-RESEARCH.md).
+  This supersedes the earlier lack-of-bundle conclusion, but not the absence
+  of a verified external SSH session/connected-host catalog route.
+- Host-aware `codex://threads/<id>?hostId=...` navigation exists in this bundle.
+  Its complete load/resume/read effects and compatibility with the user's
+  installed version remain unverified. SSH card and collection navigation
+  stay disabled; no navigation or ownership-acquisition experiment was performed.
 
 ## Explicit opt-in
 
@@ -71,12 +70,45 @@ read and attention filters. Newer local threads cannot evict a disconnected SSH
 candidate. Hidden pages and non-board views still release observation; this is
 not an always-on background watcher or a guarantee that Desktop sends a snapshot.
 
+## Explicit owner-action opt-in (new; not live-tested)
+
+With `TASKBOARD_SSH_ACTIONS` unset, all registrations remain read-only. The new
+variable accepts the same strict JSON pair array as `TASKBOARD_SSH_SESSIONS`,
+must be a subset of it, and defaults to `[]`. This is a process feature opt-in,
+not a Desktop security setting or permission to conduct live testing. No wildcard
+host authorization or automatic target registration exists. Do not add business
+sessions merely to experiment. Source and packaged MCP configs forward it.
+
+For opted-in pairs only, the board handles the **same implemented local
+confirmation kinds**: command decisions, file-change decisions with observed
+previews, structured answers and async question replies. Async replies can start
+or steer a turn through the current owner: this opt-in explicitly enables
+execution of submitted answers. No general send/resume, interrupt, settings,
+permissions-change or arbitrary RPC tool is added.
+
+Controls require a fresh v11 ordinary loaded (`active`/`idle`) snapshot. Every
+remote submission verifies its owner through targeted read-only discovery,
+checks the same connection, snapshot revision and pair remain valid, then sends
+the host-routed method/version. Successful remote responses must identify the
+expected method/owner. Revision churn fails closed and may require refreshing,
+never automatic action retry. Reply IDs, confirmations and pending IPC are
+host-scoped. Disconnect, owner loss, unsubscribe, patch gaps, cache restoration
+and unknown runtime remove capabilities; only a live replacement can restore
+them. The UI labels the host and action opt-in.
+
+Acknowledgement is not completion: the existing removal/answer-echo check is
+retained. Duplicate clicks cannot resubmit the same request. Timeout/uncertainty
+requires checking the original Desktop conversation, not blindly retrying. The
+legacy WebSocket approval relay rejects remote identity before any request. No
+remote cwd is read locally, including workspace roots in submitted answers.
+
 ## Safe display and plugin-owned collections
 
 When the already-received snapshot includes the known Desktop turn-history
 shape, the mapper reuses the local structured-question parser for a short
 unanswered-question title and the latest failed-turn marker. It does not fetch
-history, expose approval payloads, or create answer/approval controls. Missing
+history. Approval payloads and controls require the separate explicit action
+opt-in above. Missing
 or malformed history is not proof that there are no questions. No waiting-start
 timestamp, user-message timestamp, usage or free-form assistant text is invented.
 Question/error display is cleared on snapshot loss.
@@ -103,9 +135,9 @@ collections should use this fork rather than an older installed package.
 | Runtime/unread/model/mode/goal | Existing local sources | Observed supported fields only; loss means unknown |
 | Question/failure display | Existing Desktop/history parsing | Known shape from received snapshot only; read-only |
 | Collections | Existing plugin-owned records | Host-scoped association, picker, tags and search |
-| Open session | Existing local deep link | Disabled: route and read/load effects unverified |
+| Open session | Existing local deep link | Host route established statically; disabled pending load/read compatibility checks |
 | Discovery | Existing local index/listing | No verified read-only Desktop SSH listing route |
-| Approvals/answers/execution | Existing local controls | Disabled, including after reconnect |
+| Approvals/answers/execution | Existing local controls | Default denied; explicit per-pair opt-in uses current owner, fixture-tested only |
 | Usage/input timing/Git/artifacts/review/monitoring | Existing local behavior | Unavailable; no remote filesystem interpretation |
 
 ## Source, repository distribution, and installed plugin
@@ -118,7 +150,7 @@ collections should use this fork rather than an older installed package.
   UI bytes and icon bytes; provenance tests check those bytes, source UI parity,
   startup allowlists and offline artifact parity.
 - Source and repository-distribution `.mcp.json` explicitly forward
-  `TASKBOARD_SSH_SESSIONS` from the executor environment. Startup fixtures use
+  `TASKBOARD_SSH_SESSIONS` and `TASKBOARD_SSH_ACTIONS` from the executor environment. Startup fixtures use
   those actual configs and shell arguments, not an injected transport bypass.
 - The checkout’s marketplace catalog points at the fork’s
   `feat/ssh-session-observer`, not upstream `main`. Existing installed plugin
@@ -128,10 +160,11 @@ collections should use this fork rather than an older installed package.
 
 ## Safety and unfinished work
 
-- Remote approval, reply, execution, resume, ownership acquisition, and
-  unverified deep-link navigation are disabled, not offered behind a toggle.
+- Remote approval/reply execution is default denied and requires explicit
+  per-pair process opt-in. Resume, ownership acquisition and unverified
+  navigation remain unavailable. Packaging does not perform installation or actions.
 - Remote cards are excluded from local Git reads, artifacts and monitoring links.
-  Approval payloads are not board confirmations.
+  Default read-only registrations do not expose actionable approval payloads.
   Existing local operations stay unchanged.
 - No remote history fetching, last-user-message time, usage, Git or artifacts.
   Native waiting flags and recognized snapshot questions only; missing data
@@ -148,7 +181,9 @@ collections should use this fork rather than an older installed package.
   attention filters, project/title filters, owner loss and transport reconnect.
   Collection fixtures exercise real UI/MCP writes to temporary plugin data,
   identical local/remote IDs and multiple-host persistence isolation.
-  No new live observation or session mutation was performed.
+  Action fixtures additionally cover MCP startup allowlists, built UI decisions,
+  wire versions, same-ID hosts, owner/revision races, legacy relay denial, async
+  start/steer and duplicates. No new live observation or session mutation was performed.
 - No session storage reads, security changes, host/plugin installation,
   website deployment, publication, merge, or upstream PR is needed.
 

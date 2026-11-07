@@ -37,6 +37,31 @@ export function sshSessionTargets(value: string | undefined): SessionTarget[] {
   ];
 }
 
+/** Actions never register new observation targets or grant access to a whole host. */
+export function sshActionTargets(
+  value: string | undefined,
+  registered: SessionTarget[],
+): SessionTarget[] {
+  const allowed = new Set(
+    registered.map((target) =>
+      sessionKey({ id: target.threadId, hostId: target.hostId }),
+    ),
+  );
+  const actions = sshSessionTargets(value);
+  if (
+    actions.some(
+      (target) =>
+        !allowed.has(
+          sessionKey({ id: target.threadId, hostId: target.hostId }),
+        ),
+    )
+  )
+    throw new Error(
+      "TASKBOARD_SSH_ACTIONS must be a subset of TASKBOARD_SSH_SESSIONS.",
+    );
+  return actions;
+}
+
 /** Map only explicitly registered ordinary sessions; observed subagents stay excluded.
  * Metadata is display-only. Never stat, resolve, or run Git against remote cwd. */
 export function sshSessionThread(

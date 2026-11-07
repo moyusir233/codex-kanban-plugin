@@ -522,3 +522,39 @@ test("observed remote subagents stay excluded while their snapshots are unavaila
     false,
   );
 });
+
+test("remote confirmation capabilities are host-scoped, cleared on disconnect/cache and restored only explicitly", () => {
+  const live = snapshot();
+  const thread = live.threads[0];
+  live.threads = [
+    thread,
+    { ...thread, hostId: "box-a", remoteActionsEnabled: true },
+    { ...thread, hostId: "box-b", remoteActionsEnabled: false },
+  ];
+  const request = live.confirmations!.requests[0];
+  live.confirmations!.requests = [
+    request,
+    { ...request, id: "a", hostId: "box-a" },
+    { ...request, id: "b", hostId: "box-b" },
+  ];
+  assert.deepEqual(
+    reconcileSnapshot(snapshot(), live).confirmations!.requests.map(
+      (r) => r.id,
+    ),
+    [request.id, "a"],
+  );
+  const lost = structuredClone(live);
+  lost.threads[1].fresh = false;
+  const merged = reconcileSnapshot(live, lost);
+  assert.equal(merged.threads[1].remoteActionsEnabled, false);
+  assert.deepEqual(
+    merged.confirmations!.requests.map((r) => r.id),
+    [request.id],
+  );
+  assert.equal(cachedSnapshot(live).threads[1].remoteActionsEnabled, false);
+  assert.deepEqual(cachedSnapshot(live).confirmations?.requests, []);
+  assert.equal(
+    reconcileSnapshot(merged, live).threads[1].remoteActionsEnabled,
+    true,
+  );
+});

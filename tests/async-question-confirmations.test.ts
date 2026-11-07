@@ -510,3 +510,81 @@ test("async answers wait for accepted steering instead of an unaccepted pending 
   assert.equal(f.sent.length, 1);
   assert.deepEqual(f.confirmations.read().requests, []);
 });
+
+for (const active of [false, true]) {
+  test(
+    "SSH async answers preserve remote cwd and host identity; active=" + active,
+    async () => {
+      const threadId = "00000000-0000-4000-8000-000000000001";
+      const hostId = "fixture-remote";
+      const conversation: DesktopConversation = {
+        ownerClientId: "remote-owner",
+        revision: 1,
+        state: {
+          cwd: "/REMOTE_NOT_LOCAL",
+          requests: [],
+          threadRuntimeStatus: { type: active ? "active" : "idle" },
+          turns: [
+            { turnId: "question-turn", status: "completed", items: [item] },
+          ],
+        },
+      };
+      const sent: any[] = [];
+      const confirmations = new DesktopConfirmations(
+        {
+          get: (id, host = "local") =>
+            id === threadId && host === hostId ? conversation : undefined,
+          remoteActionsAllowed: (id, host) =>
+            id === threadId && host === hostId,
+          requestOwner: async (id, method, params: any, host) => {
+            sent.push({ id, method, params, host });
+            conversation.state.turns.push({
+              turnId: "reply",
+              status: "inProgress",
+              items: [
+                {
+                  id: "echo",
+                  type: "userMessage",
+                  content: [{ type: "text", text: replyText() }],
+                },
+              ],
+            });
+            return { ok: true };
+          },
+        },
+        40,
+      );
+      confirmations.update(threadId, conversation, hostId);
+      const pending = confirmations.read().requests[0];
+      assert.equal(pending.hostId, hostId);
+      await assert.rejects(
+        confirmations.reply({ id: pending.id, threadId, answers }),
+      );
+      await confirmations.reply({ id: pending.id, threadId, hostId, answers });
+      assert.equal(sent.length, 1);
+      assert.equal(sent[0].host, hostId);
+      assert.equal(sent[0].params.conversationId, threadId);
+      assert.equal(
+        sent[0].method,
+        active ? "thread-follower-steer-turn" : "thread-follower-start-turn",
+      );
+      const restore = active
+        ? sent[0].params.restoreMessage
+        : sent[0].params.turnStart.context.restoreMessage;
+      assert.equal(restore.cwd, "/REMOTE_NOT_LOCAL");
+      assert.deepEqual(restore.context.workspaceRoots, ["/REMOTE_NOT_LOCAL"]);
+      if (!active) {
+        assert.equal(sent[0].params.turnStart.request.threadId, threadId);
+        assert.equal(
+          sent[0].params.turnStart.context.inheritThreadSettings,
+          true,
+        );
+      }
+      assert.deepEqual(confirmations.read().requests, []);
+      await assert.rejects(
+        confirmations.reply({ id: pending.id, threadId, hostId, answers }),
+      );
+      assert.equal(sent.length, 1);
+    },
+  );
+}

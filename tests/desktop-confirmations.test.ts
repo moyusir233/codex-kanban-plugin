@@ -343,3 +343,87 @@ test("unsupported requests stay in the original conversation and clearing invali
   f.confirmations.clear();
   assert.deepEqual(f.confirmations.read(), { available: false, requests: [] });
 });
+
+test("SSH confirmations isolate same IDs across hosts, default deny and invalidate on owner loss", async () => {
+  const threadId = "00000000-0000-4000-8000-000000000001";
+  const hosts = ["local", "box-a", "box-b"];
+  const conversations = new Map(
+    hosts.map((host) => [
+      host,
+      {
+        ownerClientId: host,
+        revision: 1,
+        state: {
+          requests: [command(0, { threadId })],
+          threadRuntimeStatus: { type: "active" },
+        },
+      },
+    ]),
+  );
+  const sent: any[] = [];
+  const ipc = {
+    get: (_: string, host = "local") => conversations.get(host),
+    remoteActionsAllowed: (_: string, host: string) => host === "box-a",
+    requestOwner: async (
+      threadId: string,
+      method: string,
+      params: object,
+      host = "local",
+    ) => {
+      sent.push({ threadId, method, params, host });
+      conversations.get(host)!.state.requests = [];
+    },
+  };
+  const manager = new DesktopConfirmations(ipc, 40);
+  hosts.forEach((host) =>
+    manager.update(threadId, conversations.get(host)!, host),
+  );
+  assert.equal(manager.read().requests.length, 2);
+  const remote = manager.read().requests.find((r) => r.hostId === "box-a")!;
+  const local = manager.read().requests.find((r) => !r.hostId)!;
+  assert.notEqual(local.id, remote.id);
+  for (const hostId of [undefined, "box-b"])
+    await assert.rejects(
+      manager.reply({
+        id: remote.id,
+        threadId: threadId,
+        hostId,
+        decision: "accept",
+      }),
+    );
+  assert.deepEqual(sent, []);
+  await manager.reply({
+    id: remote.id,
+    threadId: threadId,
+    hostId: "box-a",
+    decision: "accept",
+  });
+  assert.equal((sent as any[]).at(0)?.host, "box-a");
+  assert.equal(conversations.get("local")!.state.requests.length, 1);
+  await assert.rejects(
+    manager.reply({
+      id: remote.id,
+      threadId: threadId,
+      hostId: "box-a",
+      decision: "accept",
+    }),
+  );
+  conversations.get("box-a")!.state.requests = [command(1, { threadId })];
+  const old = manager.read().requests.find((r) => r.hostId === "box-a")!;
+  conversations.delete("box-a");
+  await assert.rejects(
+    manager.reply({
+      id: old.id,
+      threadId: threadId,
+      hostId: "box-a",
+      decision: "decline",
+    }),
+  );
+  assert.equal(manager.read().requests[0].id, local.id);
+  const denied = new DesktopConfirmations({
+    get: ipc.get,
+    requestOwner: ipc.requestOwner,
+  });
+  denied.update(threadId, conversations.get("box-b")!, "box-b");
+  assert.deepEqual(denied.read().requests, []);
+});

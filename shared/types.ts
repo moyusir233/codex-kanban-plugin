@@ -32,8 +32,10 @@ export type Thread = {
   id: string;
   /** Omitted for legacy local sessions; remote IDs are scoped to this host. */
   hostId?: string;
-  /** Remote sessions in this fork are observation-only. */
+  /** Remote sessions have no implicit execution or navigation capabilities. */
   observationOnly?: boolean;
+  /** Explicit per-pair opt-in, valid only for the current live snapshot. */
+  remoteActionsEnabled?: boolean;
   title: string;
   cwd: string;
   project: string;

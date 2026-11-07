@@ -4,7 +4,11 @@ import { readLocalData } from "./local-data.js";
 import { GitMetadataReader } from "./git-metadata.js";
 import { DesktopIpc, type DesktopConversation } from "./desktop-ipc.js";
 import { DesktopConfirmations } from "./desktop-confirmations.js";
-import { sshSessionTargets, sshSessionThread } from "./ssh-sessions.js";
+import {
+  sshActionTargets,
+  sshSessionTargets,
+  sshSessionThread,
+} from "./ssh-sessions.js";
 import { sessionKey } from "../shared/session-identity.js";
 import { readConfirmations, replyToConfirmation } from "./confirmations.js";
 import type { ConfirmationReply } from "../shared/confirmations.js";
@@ -91,10 +95,19 @@ export class StatusBridge {
   private readonly sshTargets;
 
   constructor(
-    options: { endpoint?: string; home?: string; sshSessions?: string } = {},
+    options: {
+      endpoint?: string;
+      home?: string;
+      sshSessions?: string;
+      sshActions?: string;
+    } = {},
   ) {
     this.sshTargets = sshSessionTargets(
       options.sshSessions ?? process.env.TASKBOARD_SSH_SESSIONS,
+    );
+    const sshActions = sshActionTargets(
+      options.sshActions ?? process.env.TASKBOARD_SSH_ACTIONS,
+      this.sshTargets,
     );
     this.home = options.home ?? process.env.CODEX_HOME ?? `${homedir()}/.codex`;
     const websocket = options.endpoint ?? process.env.TASKBOARD_WS_URL;
@@ -110,20 +123,22 @@ export class StatusBridge {
     if (!websocket) {
       this.desktop = new DesktopIpc({
         home: this.home,
+        remoteActions: sshActions,
         onState: (state, message) => {
           this.state(state, message ?? null);
           if (state === "connected") this.initialSyncComplete = true;
         },
         onConversation: (id, value, hostId) => {
           if (hostId === "local") this.rememberDesktop(id, value);
+          else this.desktopConfirmations?.update(id, value, hostId);
         },
         onUnavailable: (id, hostId) => {
+          this.desktopConfirmations?.remove(id, hostId);
           if (hostId !== "local") return;
           this.userInput.delete(id);
           this.modes.delete(id);
           const runtime = this.runtime.get(id);
           if (runtime) runtime.waitingSince = null;
-          this.desktopConfirmations?.remove(id);
         },
       });
       this.desktopConfirmations = new DesktopConfirmations(this.desktop);
@@ -727,7 +742,9 @@ export class StatusBridge {
         const state = this.desktop.get(id)?.state;
         if (!state) continue;
         const confirmation = confirmations.requests.find(
-          (request) => request.threadId === id,
+          (request) =>
+            (request.hostId === undefined || request.hostId === "local") &&
+            request.threadId === id,
         );
         threads.set(id, {
           ...thread,
@@ -759,14 +776,27 @@ export class StatusBridge {
       // Append remote display data only after all local filesystem enrichment.
       threads: [
         ...threads.values(),
-        ...this.sshTargets.map((target) =>
-          sshSessionThread(
+        ...this.sshTargets.map((target) => {
+          const thread = sshSessionThread(
             target,
             this.connection.state === "connected"
               ? this.desktop?.get(target.threadId, target.hostId)
               : undefined,
-          ),
-        ),
+          );
+          const actionsEnabled =
+            thread.fresh &&
+            thread.kind === "user" &&
+            ["active", "idle"].includes(thread.runtime?.type ?? "") &&
+            !!this.desktop?.remoteActionsAllowed(
+              target.threadId,
+              target.hostId,
+            );
+          return {
+            ...thread,
+            observationOnly: !actionsEnabled,
+            remoteActionsEnabled: actionsEnabled,
+          };
+        }),
       ].sort(compareByLastUserMessage),
       confirmations,
       connection: { ...this.connection },

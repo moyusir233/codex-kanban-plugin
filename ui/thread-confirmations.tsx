@@ -57,7 +57,11 @@ function ConfirmationForm({
       onSubmitted();
     }
   }
-  const identity = { id: request.id, threadId: request.threadId };
+  const identity = {
+    id: request.id,
+    threadId: request.threadId,
+    ...(request.hostId !== undefined ? { hostId: request.hostId } : {}),
+  };
   const sendAnswers = (values: Record<string, string>) =>
     submit({
       ...identity,
@@ -98,6 +102,9 @@ function ConfirmationForm({
       aria-busy={busy}
     >
       <strong>
+        {request.hostId && request.hostId !== "local" && (
+          <span>SSH · {request.hostId} · </span>
+        )}
         {t(
           request.kind === "command"
             ? "执行操作"

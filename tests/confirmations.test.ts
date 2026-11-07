@@ -209,7 +209,7 @@ test("disconnected transports, unsupported requests and browser calls cannot sub
       id: 7,
       params,
     });
-      relay.observe(request(8, { kind: "writeStdin" }));
+    relay.observe(request(8, { kind: "writeStdin" }));
     assert.equal((await readConfirmations(endpoint)).requests.length, 0);
     relay.observe(request(1));
     const [pending] = (await readConfirmations(endpoint)).requests;
@@ -240,4 +240,16 @@ test("disconnected transports, unsupported requests and browser calls cannot sub
     );
     assert.deepEqual(sent, []);
   });
+});
+
+test("legacy local relay refuses SSH identity before any network request", async () => {
+  await assert.rejects(
+    replyToConfirmation("ws://127.0.0.1:1", {
+      id: "00000000-0000-4000-8000-000000000001",
+      threadId: "thread",
+      hostId: "box-a",
+      decision: "accept",
+    }),
+    /Desktop IPC/,
+  );
 });

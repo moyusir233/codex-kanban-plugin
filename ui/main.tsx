@@ -1092,9 +1092,11 @@ function ThreadCard({
     ? `${thread.git.isWorktree ? "worktree - " : ""}${thread.git.branch ?? "detached HEAD"}`
     : null;
   const requests =
-    local && thread.fresh
+    (local || thread.remoteActionsEnabled === true) && thread.fresh
       ? (confirmations?.requests.filter(
-          (request) => request.threadId === thread.id,
+          (request) =>
+            sessionKey({ id: request.threadId, hostId: request.hostId }) ===
+            key,
         ) ?? [])
       : [];
   const metrics = (
@@ -1175,7 +1177,10 @@ function ThreadCard({
         <span className="card-top">
           <span className="card-context" id={`thread-context-${key}`}>
             {!local && (
-              <span className="card-branch">{thread.hostId} · Read-only</span>
+              <span className="card-branch">
+                {thread.hostId} ·{" "}
+                {thread.remoteActionsEnabled ? "Actions opted in" : "Read-only"}
+              </span>
             )}
             <span className="card-project" title={thread.cwd}>
               <Folder size={12} aria-hidden="true" />

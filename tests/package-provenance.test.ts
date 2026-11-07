@@ -23,6 +23,7 @@ test("fork distribution has matching source UI, launch config and content-addres
   assert.equal(config.env.TASKBOARD_BUILD_ID, buildId);
   assert.deepEqual(config.env_vars, sourceConfig.env_vars);
   assert.ok(config.env_vars.includes("TASKBOARD_SSH_SESSIONS"));
+  assert.ok(config.env_vars.includes("TASKBOARD_SSH_ACTIONS"));
   assert.deepEqual(config.args, ["./scripts/start-mcp.sh"]);
   assert.deepEqual(ui, await readFile("dist/ui/index.html"));
   assert.deepEqual(
@@ -33,7 +34,12 @@ test("fork distribution has matching source UI, launch config and content-addres
     await readFile(join(root, "SSH-SESSIONS.md")),
     await readFile("SSH-SESSIONS.md"),
   );
+  assert.deepEqual(
+    await readFile(join(root, "SSH-PROTOCOL-RESEARCH.md")),
+    await readFile("SSH-PROTOCOL-RESEARCH.md"),
+  );
   assert.match(server.toString(), /TASKBOARD_SSH_SESSIONS/);
+  assert.match(server.toString(), /TASKBOARD_SSH_ACTIONS/);
   assert.match(server.toString(), /Number\.isSafeInteger\(key\d*\)/);
   const pkg = JSON.parse(await readFile(join(root, "package.json"), "utf8"));
   assert.equal(

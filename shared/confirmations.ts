@@ -2,6 +2,8 @@
 export type Confirmation = {
   id: string;
   threadId: string;
+  /** Omitted for local compatibility; remote requests are scoped to this host. */
+  hostId?: string;
   kind: "command" | "fileChange" | "userInput" | "asyncUserInput";
   reason: string | null;
   command: string | null;
@@ -17,7 +19,11 @@ export type Confirmation = {
   }[];
 };
 
-export type ConfirmationReply = { id: string; threadId: string } & (
+export type ConfirmationReply = {
+  id: string;
+  threadId: string;
+  hostId?: string;
+} & (
   | { decision: "accept" | "decline" | "cancel" }
   | { answers: Record<string, { answers: string[] }> }
 );

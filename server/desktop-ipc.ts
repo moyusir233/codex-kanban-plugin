@@ -23,6 +23,8 @@ type Options = {
   onUnavailable: (threadId: string, hostId: string) => void;
   socketPath?: string;
   retryMs?: number;
+  /** Explicit registered pairs only; absent means all remote actions are denied. */
+  remoteActions?: SessionTarget[];
 };
 
 const ownerMethods = new Set([
@@ -49,7 +51,9 @@ export class DesktopIpc {
       resolve: (value: any) => void;
       reject: (error: Error) => void;
       timer: ReturnType<typeof setTimeout>;
-      threadId?: string;
+      sessionKey?: string;
+      expectedOwner?: string;
+      expectedMethod?: string;
     }
   >();
 
@@ -105,29 +109,88 @@ export class DesktopIpc {
   }
 
   /** 用户明确作答后才转给当前 owner；路由成功不代表原请求已完成。 */
-  requestOwner(
+  async requestOwner(
     threadId: string,
     method: string,
     params: object,
     hostId = "local",
   ): Promise<any> {
-    // Never route remote operations, even if a caller supplies local-looking IDs.
+    const remote = hostId !== "local";
     const parameterHost = (params as { hostId?: unknown }).hostId;
     if (
-      hostId !== "local" ||
-      (parameterHost !== undefined && parameterHost !== "local")
+      (parameterHost !== undefined && (remote || parameterHost !== "local")) ||
+      (remote && !this.remoteActionsAllowed(threadId, hostId))
     )
-      return Promise.reject(
-        new Error("SSH sessions are observation-only; actions are disabled."),
+      throw new Error(
+        "SSH sessions are observation-only; actions are disabled.",
       );
-    const conversation = this.get(threadId);
+    const conversation = this.get(threadId, hostId);
     if (!conversation || !this.clientId)
-      return Promise.reject(
-        new Error("该对话的桌面连接已失效，请刷新后重试。"),
-      );
+      throw new Error("该对话的桌面连接已失效，请刷新后重试。");
+    if (
+      remote &&
+      (conversation.state?.source?.subAgent ||
+        !["active", "idle"].includes(
+          conversation.state?.threadRuntimeStatus?.type,
+        ))
+    )
+      throw new Error("SSH actions require a live ordinary loaded session.");
     if (!ownerMethods.has(method))
-      return Promise.reject(new Error("看板暂不支持此类桌面操作。"));
-    return this.request(method, params, conversation.ownerClientId, threadId);
+      throw new Error("看板暂不支持此类桌面操作。");
+    const key = sessionKey({ id: threadId, hostId });
+    if (remote) {
+      const input = params as any;
+      if (
+        input.conversationId !== threadId ||
+        (input.turnStart !== undefined &&
+          input.turnStart?.request?.threadId !== threadId) ||
+        input.turnStart?.context?.responseItems?.length
+      )
+        throw new Error(
+          "Invalid SSH owner request identity or untrusted app input.",
+        );
+      // Verify the snapshot owner still owns this exact host/thread pair. Discovery
+      // is targeted, read-only and never acquires ownership or enumerates threads.
+      const clientId = this.clientId;
+      const revision = conversation.revision;
+      const response = await this.request(
+        "thread-owner-discovery",
+        { hostId, conversationId: threadId },
+        conversation.ownerClientId,
+        key,
+        undefined,
+        true,
+      );
+      if (
+        response.handledByClientId !== conversation.ownerClientId ||
+        this.clientId !== clientId ||
+        this.get(threadId, hostId) !== conversation ||
+        conversation.revision !== revision ||
+        !this.remoteActionsAllowed(threadId, hostId)
+      )
+        throw new Error(
+          "SSH owner changed; refresh and check the original conversation.",
+        );
+    }
+    return this.request(
+      method,
+      params,
+      conversation.ownerClientId,
+      key,
+      remote ? hostId : undefined,
+    );
+  }
+
+  remoteActionsAllowed(threadId: string, hostId: string): boolean {
+    const key = sessionKey({ id: threadId, hostId });
+    return (
+      hostId !== "local" &&
+      this.watched.has(key) &&
+      (this.options.remoteActions ?? []).some(
+        (target) =>
+          sessionKey({ id: target.threadId, hostId: target.hostId }) === key,
+      )
+    );
   }
 
   /** 重新初始化观察者身份；断线后撤销旧状态，再恢复当前订阅。 */
@@ -202,7 +265,9 @@ export class DesktopIpc {
     method: string,
     params: object,
     ownerClientId?: string,
-    threadId?: string,
+    key?: string,
+    hostId?: string,
+    envelope = false,
   ): Promise<any> {
     return new Promise((resolve, reject) => {
       const requestId = randomUUID();
@@ -211,10 +276,16 @@ export class DesktopIpc {
         reject(new Error("Codex 桌面请求超时，请刷新后确认结果。"));
       }, 5000);
       this.pending.set(requestId, {
-        resolve,
         reject,
         timer,
-        threadId,
+        sessionKey: key,
+        ...(hostId || envelope
+          ? {
+              expectedOwner: ownerClientId,
+              expectedMethod: method,
+            }
+          : {}),
+        resolve: envelope ? resolve : (message) => resolve(message.result),
       });
       if (
         !this.send({
@@ -230,6 +301,12 @@ export class DesktopIpc {
           method,
           params,
           ...(ownerClientId ? { targetClientId: ownerClientId } : {}),
+          ...(hostId
+            ? {
+                hostId,
+                version: method === "thread-follower-start-turn" ? 3 : 2,
+              }
+            : {}),
         })
       ) {
         clearTimeout(timer);
@@ -272,7 +349,13 @@ export class DesktopIpc {
       clearTimeout(pending.timer);
       if (message.resultType !== "success")
         pending.reject(new Error(message.error || "Codex 桌面处理请求失败。"));
-      else pending.resolve(message.result);
+      else if (
+        pending.expectedOwner &&
+        (message.handledByClientId !== pending.expectedOwner ||
+          message.method !== pending.expectedMethod)
+      )
+        pending.reject(new Error("SSH owner response identity mismatch."));
+      else pending.resolve(message);
       return;
     }
     if (
@@ -365,9 +448,9 @@ export class DesktopIpc {
     for (const id of this.conversations.keys()) this.invalidate(id);
   }
 
-  private rejectPending(error: Error, threadId?: string) {
+  private rejectPending(error: Error, key?: string) {
     for (const [id, pending] of this.pending)
-      if (!threadId || pending.threadId === threadId) {
+      if (!key || pending.sessionKey === key) {
         clearTimeout(pending.timer);
         this.pending.delete(id);
         pending.reject(error);

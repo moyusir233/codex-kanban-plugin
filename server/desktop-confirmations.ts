@@ -8,6 +8,7 @@ import type {
 import { confirmationReplyInput } from "./confirmations.js";
 import type { DesktopConversation, DesktopIpc } from "./desktop-ipc.js";
 import { desktopInputState, desktopTurns, inputState } from "./user-input.js";
+import { remoteSessionTarget, sessionKey } from "../shared/session-identity.js";
 
 type Pending = {
   owner: string;
@@ -169,13 +170,30 @@ export class DesktopConfirmations {
   private threads = new Map<string, Map<string, Pending>>();
 
   constructor(
-    private readonly ipc: Pick<DesktopIpc, "get" | "requestOwner">,
+    private readonly ipc: Pick<DesktopIpc, "get" | "requestOwner"> &
+      Partial<Pick<DesktopIpc, "remoteActionsAllowed">>,
     private readonly timeoutMs = 5000,
   ) {}
 
   /** 每个原请求保留稳定的卡片 ID；owner 或请求内容改变后旧 ID 失效。 */
-  update(threadId: string, conversation: DesktopConversation) {
-    const previous = this.threads.get(threadId);
+  update(
+    threadId: string,
+    conversation: DesktopConversation,
+    hostId = "local",
+  ) {
+    const identity = sessionKey({ id: threadId, hostId });
+    if (
+      hostId !== "local" &&
+      (!this.ipc.remoteActionsAllowed?.(threadId, hostId) ||
+        conversation.state?.source?.subAgent ||
+        !["active", "idle"].includes(
+          conversation.state?.threadRuntimeStatus?.type,
+        ))
+    ) {
+      this.remove(threadId, hostId);
+      return;
+    }
+    const previous = this.threads.get(identity);
     const next = new Map<string, Pending>();
     const question = asyncRequest(threadId, conversation.state);
     for (const raw of [
@@ -192,16 +210,17 @@ export class DesktopConfirmations {
         confirmation: {
           ...confirmation,
           id: known?.confirmation.id ?? randomUUID(),
+          ...(hostId !== "local" ? { hostId } : {}),
         },
         sent: known?.sent ?? false,
       });
     }
-    this.threads.set(threadId, next);
+    this.threads.set(identity, next);
   }
 
   /** 掉线、取消观察或 owner 退出时，立即撤下对应卡片。 */
-  remove(threadId: string) {
-    this.threads.delete(threadId);
+  remove(threadId: string, hostId = "local") {
+    this.threads.delete(sessionKey({ id: threadId, hostId }));
   }
 
   /** 清除本次桌面连接内的全部请求标识。 */
@@ -211,10 +230,14 @@ export class DesktopConfirmations {
 
   /** 读取前再次对照当前缓存，不把上一次快照里的请求当作仍待处理。 */
   read(): Confirmations {
-    for (const threadId of this.threads.keys()) {
-      const current = this.ipc.get(threadId);
-      if (current) this.update(threadId, current);
-      else this.remove(threadId);
+    for (const key of this.threads.keys()) {
+      const target = remoteSessionTarget(key) ?? {
+        threadId: key,
+        hostId: "local",
+      };
+      const current = this.ipc.get(target.threadId, target.hostId);
+      if (current) this.update(target.threadId, current, target.hostId);
+      else this.remove(target.threadId, target.hostId);
     }
     return {
       available: this.threads.size > 0,
@@ -229,12 +252,14 @@ export class DesktopConfirmations {
   /** 只提交一次；等待原请求从同一 owner 的快照移除后再返回已提交。 */
   async reply(input: ConfirmationReply): Promise<{ submitted: true }> {
     const parsed = confirmationReplyInput.parse(input);
+    const hostId = parsed.hostId ?? "local";
+    const identity = sessionKey({ id: parsed.threadId, hostId });
     this.read();
-    const pending = [
-      ...(this.threads.get(parsed.threadId)?.values() ?? []),
-    ].find((entry) => entry.confirmation.id === parsed.id && !entry.sent);
+    const pending = [...(this.threads.get(identity)?.values() ?? [])].find(
+      (entry) => entry.confirmation.id === parsed.id && !entry.sent,
+    );
     if (!pending) throw stale();
-    const current = this.ipc.get(parsed.threadId);
+    const current = this.ipc.get(parsed.threadId, hostId);
     if (!current || current.ownerClientId !== pending.owner) throw stale();
     let params: any = {
       conversationId: parsed.threadId,
@@ -342,15 +367,15 @@ export class DesktopConfirmations {
     // 从此不再接受同一卡片的第二次点击，避免超时后的重复决策。
     pending.sent = true;
     try {
-      await this.ipc.requestOwner(parsed.threadId, method, params);
+      await this.ipc.requestOwner(parsed.threadId, method, params, hostId);
     } catch {
       throw new Error("确认发送未完成，请在原对话核对结果，避免重复提交。");
     }
     const deadline = Date.now() + this.timeoutMs;
     do {
-      const latest = this.ipc.get(parsed.threadId);
+      const latest = this.ipc.get(parsed.threadId, hostId);
       if (
-        !this.threads.has(parsed.threadId) ||
+        !this.threads.has(identity) ||
         !latest ||
         latest.ownerClientId !== pending.owner
       )

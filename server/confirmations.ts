@@ -7,6 +7,7 @@ import type {
 const replyIdentity = z.object({
   id: z.uuid(),
   threadId: z.string().min(1).max(200),
+  hostId: z.string().min(1).max(200).optional(),
 });
 export const confirmationReplyInput = z.union([
   replyIdentity
@@ -52,6 +53,9 @@ export async function replyToConfirmation(
   input: ConfirmationReply,
 ) {
   const parsed = confirmationReplyInput.parse(input);
+  // This legacy relay has no host-routed transport. Never drop a remote identity.
+  if (parsed.hostId !== undefined && parsed.hostId !== "local")
+    throw new Error("SSH actions require the Desktop IPC owner transport.");
   const response = await fetch(relayUrl(endpoint, "/respond"), {
     method: "POST",
     headers: { "Content-Type": "application/json" },

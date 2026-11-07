@@ -5,6 +5,7 @@ import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { DesktopIpc, type DesktopConversation } from "../server/desktop-ipc";
+import type { SessionTarget } from "../shared/session-identity";
 
 const thread = "existing-thread";
 const owner = "desktop-window-owner";
@@ -26,7 +27,7 @@ function frame(message: object) {
 }
 
 /** 隔离的桌面路由器，仅在临时 Unix socket 上模拟原协议。 */
-async function fixture() {
+async function fixture(remoteActions?: SessionTarget[]) {
   const home = await mkdtemp(join(tmpdir(), "kanban-ipc-"));
   const socketPath = join(home, "ipc.sock");
   const messages: any[] = [];
@@ -68,6 +69,7 @@ async function fixture() {
     home,
     socketPath,
     retryMs: 20,
+    remoteActions,
     onState: (state, message) => connectionStates.push({ state, message }),
     onConversation: (id, value) => changes.push({ id, value }),
     onUnavailable: (id) => unavailable.push(id),
@@ -713,5 +715,194 @@ test("remote patches reject dangerous keys and non-scalar paths before property 
     }
   } finally {
     await f.close();
+  }
+});
+
+test("opted-in SSH owner actions use top-level host, bumped versions and targeted ownership checks", async () => {
+  const f = await fixture([{ hostId: remoteHost, threadId: thread }]);
+  try {
+    await f.ready();
+    f.client.watch([
+      thread,
+      { hostId: remoteHost, threadId: thread },
+      { hostId: "other", threadId: thread },
+    ]);
+    for (const hostId of [remoteHost, "other"])
+      f.send({
+        type: "broadcast",
+        method: "thread-stream-state-changed",
+        version: 11,
+        sourceClientId: "ssh-owner",
+        params: {
+          hostId,
+          conversationId: thread,
+          change: {
+            type: "snapshot",
+            revision: 1,
+            conversationState: { threadRuntimeStatus: { type: "active" } },
+          },
+        },
+      });
+    f.snapshot({ threadRuntimeStatus: { type: "idle" } });
+    await until(
+      () => !!f.client.get(thread, remoteHost) && !!f.client.get(thread),
+    );
+    const methods = [
+      "thread-follower-command-approval-decision",
+      "thread-follower-file-approval-decision",
+      "thread-follower-submit-user-input",
+      "thread-follower-start-turn",
+      "thread-follower-steer-turn",
+    ];
+    for (const method of methods) {
+      const before = f.messages.length;
+      const params = {
+        conversationId: thread,
+        ...(method.endsWith("start-turn")
+          ? { turnStart: { request: { threadId: thread } } }
+          : {}),
+      };
+      const result = f.client.requestOwner(thread, method, params, remoteHost);
+      await until(() =>
+        f.messages
+          .slice(before)
+          .some((m) => m.method === "thread-owner-discovery"),
+      );
+      const discovery = f.messages.at(-1);
+      assert.deepEqual(discovery.params, {
+        hostId: remoteHost,
+        conversationId: thread,
+      });
+      assert.equal(discovery.hostId, undefined);
+      assert.equal(discovery.version, 1);
+      assert.equal(discovery.targetClientId, "ssh-owner");
+      f.send({
+        type: "response",
+        requestId: discovery.requestId,
+        resultType: "success",
+        method: discovery.method,
+        handledByClientId: "ssh-owner",
+        result: { supportsUntrustedAppInput: true },
+      });
+      await until(() =>
+        f.messages.slice(before).some((m) => m.method === method),
+      );
+      const action = f.messages.at(-1);
+      assert.equal(action.hostId, remoteHost);
+      assert.equal(action.params.hostId, undefined);
+      assert.equal(action.version, method.endsWith("start-turn") ? 3 : 2);
+      assert.equal(action.targetClientId, "ssh-owner");
+      f.send({
+        type: "response",
+        requestId: action.requestId,
+        resultType: "success",
+        method,
+        handledByClientId: "ssh-owner",
+        result: { ok: true },
+      });
+      assert.deepEqual(await result, { ok: true });
+    }
+    const before = f.messages.length;
+    for (const [method, params, host] of [
+      [methods[0], { conversationId: thread }, "other"],
+      [methods[0], { conversationId: "wrong" }, remoteHost],
+      [methods[0], { conversationId: thread, hostId: "local" }, remoteHost],
+      ["thread/resume", { conversationId: thread }, remoteHost],
+      [
+        methods[3],
+        {
+          conversationId: thread,
+          turnStart: { request: { threadId: "wrong" } },
+        },
+        remoteHost,
+      ],
+    ] as const)
+      await assert.rejects(f.client.requestOwner(thread, method, params, host));
+    assert.equal(f.messages.length, before);
+    // Losing a remote owner cancels only that pair's pending operation.
+    const remoteResult = f.client.requestOwner(
+      thread,
+      methods[0],
+      { conversationId: thread },
+      remoteHost,
+    );
+    const rejected = assert.rejects(remoteResult, /失效/);
+    await until(() => f.messages.length > before);
+    const localResult = f.client.requestOwner(thread, methods[0], {
+      conversationId: thread,
+    });
+    await until(() => f.messages.at(-1)?.targetClientId === owner);
+    const localRequest = f.messages.at(-1);
+    f.send({
+      type: "broadcast",
+      method: "client-status-changed",
+      params: { clientId: "ssh-owner", status: "disconnected" },
+    });
+    await rejected;
+    f.send({
+      type: "response",
+      requestId: localRequest.requestId,
+      resultType: "success",
+      result: { ok: true },
+    });
+    assert.deepEqual(await localResult, { ok: true });
+    assert.ok(f.client.get(thread));
+  } finally {
+    await f.close();
+  }
+});
+
+test("SSH discovery revision races and wrong owner responses fail closed without sending an action", async () => {
+  for (const mode of ["wrong-owner", "revision", "disconnect"] as const) {
+    const f = await fixture([{ hostId: remoteHost, threadId: thread }]);
+    try {
+      await f.ready();
+      f.client.watch([{ hostId: remoteHost, threadId: thread }]);
+      const snapshot = (revision: number) =>
+        f.send({
+          type: "broadcast",
+          method: "thread-stream-state-changed",
+          version: 11,
+          sourceClientId: "ssh-owner",
+          params: {
+            hostId: remoteHost,
+            conversationId: thread,
+            change: {
+              type: "snapshot",
+              revision,
+              conversationState: { threadRuntimeStatus: { type: "active" } },
+            },
+          },
+        });
+      snapshot(1);
+      await until(() => !!f.client.get(thread, remoteHost));
+      const result = f.client.requestOwner(
+        thread,
+        "thread-follower-submit-user-input",
+        { conversationId: thread },
+        remoteHost,
+      );
+      const rejected = assert.rejects(result);
+      await until(() => f.messages.at(-1)?.method === "thread-owner-discovery");
+      const discovery = f.messages.at(-1);
+      if (mode === "revision") snapshot(2);
+      if (mode === "disconnect") f.client.watch([]);
+      f.send({
+        type: "response",
+        requestId: discovery.requestId,
+        resultType: "success",
+        method: discovery.method,
+        handledByClientId: mode === "wrong-owner" ? "wrong" : "ssh-owner",
+        result: {},
+      });
+      await rejected;
+      assert.ok(
+        !f.messages.some(
+          (m) => m.method === "thread-follower-submit-user-input",
+        ),
+      );
+    } finally {
+      await f.close();
+    }
   }
 });

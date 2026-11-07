@@ -9,7 +9,8 @@
         "PATH",
         "CODEX_HOME",
         "TASKBOARD_WS_URL",
-        "TASKBOARD_SSH_SESSIONS"
+        "TASKBOARD_SSH_SESSIONS",
+        "TASKBOARD_SSH_ACTIONS"
       ],
       "startup_timeout_sec": 180,
       "tool_timeout_sec": 60

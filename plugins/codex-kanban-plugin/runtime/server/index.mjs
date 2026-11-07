@@ -51872,20 +51872,57 @@ var DesktopIpc = class {
     return this.conversations.get(sessionKey({ id: threadId, hostId }));
   }
   /** 用户明确作答后才转给当前 owner；路由成功不代表原请求已完成。 */
-  requestOwner(threadId, method, params, hostId = "local") {
+  async requestOwner(threadId, method, params, hostId = "local") {
+    const remote = hostId !== "local";
     const parameterHost = params.hostId;
-    if (hostId !== "local" || parameterHost !== void 0 && parameterHost !== "local")
-      return Promise.reject(
-        new Error("SSH sessions are observation-only; actions are disabled.")
+    if (parameterHost !== void 0 && (remote || parameterHost !== "local") || remote && !this.remoteActionsAllowed(threadId, hostId))
+      throw new Error(
+        "SSH sessions are observation-only; actions are disabled."
       );
-    const conversation = this.get(threadId);
+    const conversation = this.get(threadId, hostId);
     if (!conversation || !this.clientId)
-      return Promise.reject(
-        new Error("\u8BE5\u5BF9\u8BDD\u7684\u684C\u9762\u8FDE\u63A5\u5DF2\u5931\u6548\uFF0C\u8BF7\u5237\u65B0\u540E\u91CD\u8BD5\u3002")
-      );
+      throw new Error("\u8BE5\u5BF9\u8BDD\u7684\u684C\u9762\u8FDE\u63A5\u5DF2\u5931\u6548\uFF0C\u8BF7\u5237\u65B0\u540E\u91CD\u8BD5\u3002");
+    if (remote && (conversation.state?.source?.subAgent || !["active", "idle"].includes(
+      conversation.state?.threadRuntimeStatus?.type
+    )))
+      throw new Error("SSH actions require a live ordinary loaded session.");
     if (!ownerMethods.has(method))
-      return Promise.reject(new Error("\u770B\u677F\u6682\u4E0D\u652F\u6301\u6B64\u7C7B\u684C\u9762\u64CD\u4F5C\u3002"));
-    return this.request(method, params, conversation.ownerClientId, threadId);
+      throw new Error("\u770B\u677F\u6682\u4E0D\u652F\u6301\u6B64\u7C7B\u684C\u9762\u64CD\u4F5C\u3002");
+    const key = sessionKey({ id: threadId, hostId });
+    if (remote) {
+      const input2 = params;
+      if (input2.conversationId !== threadId || input2.turnStart !== void 0 && input2.turnStart?.request?.threadId !== threadId || input2.turnStart?.context?.responseItems?.length)
+        throw new Error(
+          "Invalid SSH owner request identity or untrusted app input."
+        );
+      const clientId = this.clientId;
+      const revision = conversation.revision;
+      const response = await this.request(
+        "thread-owner-discovery",
+        { hostId, conversationId: threadId },
+        conversation.ownerClientId,
+        key,
+        void 0,
+        true
+      );
+      if (response.handledByClientId !== conversation.ownerClientId || this.clientId !== clientId || this.get(threadId, hostId) !== conversation || conversation.revision !== revision || !this.remoteActionsAllowed(threadId, hostId))
+        throw new Error(
+          "SSH owner changed; refresh and check the original conversation."
+        );
+    }
+    return this.request(
+      method,
+      params,
+      conversation.ownerClientId,
+      key,
+      remote ? hostId : void 0
+    );
+  }
+  remoteActionsAllowed(threadId, hostId) {
+    const key = sessionKey({ id: threadId, hostId });
+    return hostId !== "local" && this.watched.has(key) && (this.options.remoteActions ?? []).some(
+      (target) => sessionKey({ id: target.threadId, hostId: target.hostId }) === key
+    );
   }
   /** 重新初始化观察者身份；断线后撤销旧状态，再恢复当前订阅。 */
   connect() {
@@ -51951,7 +51988,7 @@ var DesktopIpc = class {
     return true;
   }
   /** 用独立请求 ID 等待路由回复，连接失效时统一拒绝未完成请求。 */
-  request(method, params, ownerClientId, threadId) {
+  request(method, params, ownerClientId, key, hostId, envelope = false) {
     return new Promise((resolve2, reject) => {
       const requestId = randomUUID();
       const timer = setTimeout(() => {
@@ -51959,10 +51996,14 @@ var DesktopIpc = class {
         reject(new Error("Codex \u684C\u9762\u8BF7\u6C42\u8D85\u65F6\uFF0C\u8BF7\u5237\u65B0\u540E\u786E\u8BA4\u7ED3\u679C\u3002"));
       }, 5e3);
       this.pending.set(requestId, {
-        resolve: resolve2,
         reject,
         timer,
-        threadId
+        sessionKey: key,
+        ...hostId || envelope ? {
+          expectedOwner: ownerClientId,
+          expectedMethod: method
+        } : {},
+        resolve: envelope ? resolve2 : (message) => resolve2(message.result)
       });
       if (!this.send({
         type: "request",
@@ -51971,7 +52012,11 @@ var DesktopIpc = class {
         version: method === "initialize" ? 0 : method === "thread-follower-start-turn" ? 2 : 1,
         method,
         params,
-        ...ownerClientId ? { targetClientId: ownerClientId } : {}
+        ...ownerClientId ? { targetClientId: ownerClientId } : {},
+        ...hostId ? {
+          hostId,
+          version: method === "thread-follower-start-turn" ? 3 : 2
+        } : {}
       })) {
         clearTimeout(timer);
         this.pending.delete(requestId);
@@ -52011,7 +52056,9 @@ var DesktopIpc = class {
       clearTimeout(pending.timer);
       if (message.resultType !== "success")
         pending.reject(new Error(message.error || "Codex \u684C\u9762\u5904\u7406\u8BF7\u6C42\u5931\u8D25\u3002"));
-      else pending.resolve(message.result);
+      else if (pending.expectedOwner && (message.handledByClientId !== pending.expectedOwner || message.method !== pending.expectedMethod))
+        pending.reject(new Error("SSH owner response identity mismatch."));
+      else pending.resolve(message);
       return;
     }
     if (message.type !== "broadcast" || message.targetClientIds && !message.targetClientIds.includes(this.clientId))
@@ -52091,9 +52138,9 @@ var DesktopIpc = class {
   invalidateAll() {
     for (const id of this.conversations.keys()) this.invalidate(id);
   }
-  rejectPending(error112, threadId) {
+  rejectPending(error112, key) {
     for (const [id, pending] of this.pending)
-      if (!threadId || pending.threadId === threadId) {
+      if (!key || pending.sessionKey === key) {
         clearTimeout(pending.timer);
         this.pending.delete(id);
         pending.reject(error112);
@@ -52144,7 +52191,8 @@ import { setTimeout as pause } from "node:timers/promises";
 // server/confirmations.ts
 var replyIdentity = external_exports.object({
   id: external_exports.uuid(),
-  threadId: external_exports.string().min(1).max(200)
+  threadId: external_exports.string().min(1).max(200),
+  hostId: external_exports.string().min(1).max(200).optional()
 });
 var confirmationReplyInput = external_exports.union([
   replyIdentity.extend({ decision: external_exports.enum(["accept", "decline", "cancel"]) }).strict(),
@@ -52173,6 +52221,8 @@ async function readConfirmations(endpoint) {
 }
 async function replyToConfirmation(endpoint, input2) {
   const parsed = confirmationReplyInput.parse(input2);
+  if (parsed.hostId !== void 0 && parsed.hostId !== "local")
+    throw new Error("SSH actions require the Desktop IPC owner transport.");
   const response = await fetch(relayUrl(endpoint, "/respond"), {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -52396,8 +52446,15 @@ var DesktopConfirmations = class {
   timeoutMs;
   threads = /* @__PURE__ */ new Map();
   /** 每个原请求保留稳定的卡片 ID；owner 或请求内容改变后旧 ID 失效。 */
-  update(threadId, conversation) {
-    const previous = this.threads.get(threadId);
+  update(threadId, conversation, hostId = "local") {
+    const identity = sessionKey({ id: threadId, hostId });
+    if (hostId !== "local" && (!this.ipc.remoteActionsAllowed?.(threadId, hostId) || conversation.state?.source?.subAgent || !["active", "idle"].includes(
+      conversation.state?.threadRuntimeStatus?.type
+    ))) {
+      this.remove(threadId, hostId);
+      return;
+    }
+    const previous = this.threads.get(identity);
     const next = /* @__PURE__ */ new Map();
     const question = asyncRequest(threadId, conversation.state);
     for (const raw of [
@@ -52413,16 +52470,17 @@ var DesktopConfirmations = class {
         raw,
         confirmation: {
           ...confirmation,
-          id: known?.confirmation.id ?? randomUUID2()
+          id: known?.confirmation.id ?? randomUUID2(),
+          ...hostId !== "local" ? { hostId } : {}
         },
         sent: known?.sent ?? false
       });
     }
-    this.threads.set(threadId, next);
+    this.threads.set(identity, next);
   }
   /** 掉线、取消观察或 owner 退出时，立即撤下对应卡片。 */
-  remove(threadId) {
-    this.threads.delete(threadId);
+  remove(threadId, hostId = "local") {
+    this.threads.delete(sessionKey({ id: threadId, hostId }));
   }
   /** 清除本次桌面连接内的全部请求标识。 */
   clear() {
@@ -52430,10 +52488,14 @@ var DesktopConfirmations = class {
   }
   /** 读取前再次对照当前缓存，不把上一次快照里的请求当作仍待处理。 */
   read() {
-    for (const threadId of this.threads.keys()) {
-      const current = this.ipc.get(threadId);
-      if (current) this.update(threadId, current);
-      else this.remove(threadId);
+    for (const key of this.threads.keys()) {
+      const target = remoteSessionTarget(key) ?? {
+        threadId: key,
+        hostId: "local"
+      };
+      const current = this.ipc.get(target.threadId, target.hostId);
+      if (current) this.update(target.threadId, current, target.hostId);
+      else this.remove(target.threadId, target.hostId);
     }
     return {
       available: this.threads.size > 0,
@@ -52445,12 +52507,14 @@ var DesktopConfirmations = class {
   /** 只提交一次；等待原请求从同一 owner 的快照移除后再返回已提交。 */
   async reply(input2) {
     const parsed = confirmationReplyInput.parse(input2);
+    const hostId = parsed.hostId ?? "local";
+    const identity = sessionKey({ id: parsed.threadId, hostId });
     this.read();
-    const pending = [
-      ...this.threads.get(parsed.threadId)?.values() ?? []
-    ].find((entry) => entry.confirmation.id === parsed.id && !entry.sent);
+    const pending = [...this.threads.get(identity)?.values() ?? []].find(
+      (entry) => entry.confirmation.id === parsed.id && !entry.sent
+    );
     if (!pending) throw stale();
-    const current = this.ipc.get(parsed.threadId);
+    const current = this.ipc.get(parsed.threadId, hostId);
     if (!current || current.ownerClientId !== pending.owner) throw stale();
     let params = {
       conversationId: parsed.threadId,
@@ -52539,14 +52603,14 @@ ${JSON.stringify(replies)}
     }
     pending.sent = true;
     try {
-      await this.ipc.requestOwner(parsed.threadId, method, params);
+      await this.ipc.requestOwner(parsed.threadId, method, params, hostId);
     } catch {
       throw new Error("\u786E\u8BA4\u53D1\u9001\u672A\u5B8C\u6210\uFF0C\u8BF7\u5728\u539F\u5BF9\u8BDD\u6838\u5BF9\u7ED3\u679C\uFF0C\u907F\u514D\u91CD\u590D\u63D0\u4EA4\u3002");
     }
     const deadline = Date.now() + this.timeoutMs;
     do {
-      const latest = this.ipc.get(parsed.threadId);
-      if (!this.threads.has(parsed.threadId) || !latest || latest.ownerClientId !== pending.owner)
+      const latest = this.ipc.get(parsed.threadId, hostId);
+      if (!this.threads.has(identity) || !latest || latest.ownerClientId !== pending.owner)
         throw stale();
       const unanswered = pending.confirmation.kind === "asyncUserInput" ? inputState(
         "desktop",
@@ -52580,6 +52644,23 @@ function sshSessionTargets(value) {
       ])
     ).values()
   ];
+}
+function sshActionTargets(value, registered) {
+  const allowed = new Set(
+    registered.map(
+      (target) => sessionKey({ id: target.threadId, hostId: target.hostId })
+    )
+  );
+  const actions = sshSessionTargets(value);
+  if (actions.some(
+    (target) => !allowed.has(
+      sessionKey({ id: target.threadId, hostId: target.hostId })
+    )
+  ))
+    throw new Error(
+      "TASKBOARD_SSH_ACTIONS must be a subset of TASKBOARD_SSH_SESSIONS."
+    );
+  return actions;
 }
 function sshSessionThread(target, conversation) {
   const state = conversation?.state;
@@ -52706,6 +52787,10 @@ var StatusBridge = class {
     this.sshTargets = sshSessionTargets(
       options.sshSessions ?? process.env.TASKBOARD_SSH_SESSIONS
     );
+    const sshActions = sshActionTargets(
+      options.sshActions ?? process.env.TASKBOARD_SSH_ACTIONS,
+      this.sshTargets
+    );
     this.home = options.home ?? process.env.CODEX_HOME ?? `${homedir()}/.codex`;
     const websocket = options.endpoint ?? process.env.TASKBOARD_WS_URL;
     this.endpoint = websocket ? localEndpoint(websocket) : `ipc://${join4(this.home, "ipc", "ipc.sock")}`;
@@ -52718,20 +52803,22 @@ var StatusBridge = class {
     if (!websocket) {
       this.desktop = new DesktopIpc({
         home: this.home,
+        remoteActions: sshActions,
         onState: (state, message) => {
           this.state(state, message ?? null);
           if (state === "connected") this.initialSyncComplete = true;
         },
         onConversation: (id, value, hostId) => {
           if (hostId === "local") this.rememberDesktop(id, value);
+          else this.desktopConfirmations?.update(id, value, hostId);
         },
         onUnavailable: (id, hostId) => {
+          this.desktopConfirmations?.remove(id, hostId);
           if (hostId !== "local") return;
           this.userInput.delete(id);
           this.modes.delete(id);
           const runtime = this.runtime.get(id);
           if (runtime) runtime.waitingSince = null;
-          this.desktopConfirmations?.remove(id);
         }
       });
       this.desktopConfirmations = new DesktopConfirmations(this.desktop);
@@ -53212,7 +53299,7 @@ var StatusBridge = class {
         const state = this.desktop.get(id)?.state;
         if (!state) continue;
         const confirmation = confirmations.requests.find(
-          (request) => request.threadId === id
+          (request) => (request.hostId === void 0 || request.hostId === "local") && request.threadId === id
         );
         threads.set(id, {
           ...thread,
@@ -53229,12 +53316,21 @@ var StatusBridge = class {
       // Append remote display data only after all local filesystem enrichment.
       threads: [
         ...threads.values(),
-        ...this.sshTargets.map(
-          (target) => sshSessionThread(
+        ...this.sshTargets.map((target) => {
+          const thread = sshSessionThread(
             target,
             this.connection.state === "connected" ? this.desktop?.get(target.threadId, target.hostId) : void 0
-          )
-        )
+          );
+          const actionsEnabled = thread.fresh && thread.kind === "user" && ["active", "idle"].includes(thread.runtime?.type ?? "") && !!this.desktop?.remoteActionsAllowed(
+            target.threadId,
+            target.hostId
+          );
+          return {
+            ...thread,
+            observationOnly: !actionsEnabled,
+            remoteActionsEnabled: actionsEnabled
+          };
+        })
       ].sort(compareByLastUserMessage),
       confirmations,
       connection: { ...this.connection },
