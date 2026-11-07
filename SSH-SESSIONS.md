@@ -122,6 +122,18 @@ uses observation time or final-answer start as completion time. This does not
 fetch history or establish tokens, free-form input or user-message timestamps.
 Timing is cleared on disconnect/cache and restored by a new live snapshot only.
 
+The board can display historical **successful wait relationships** from the
+latest received turn: recognized `codex_app.wait_threads` calls must have
+completed successfully, used a positive/default timeout, and explicitly returned
+the exact requested host/thread pairs. An omitted argument host inherits the
+caller SSH host, never local. Only already registered, live, ordinary SSH cards
+can join the graph; results cannot discover targets, supply titles/runtime or
+expose tool output. The labels say **Waited for / Was waited on by**, not that a
+watcher is still running. A new turn, snapshot/owner loss, unknown runtime or
+cache restoration clears the relationships; live replacement can restore them.
+No `wait_threads` call, polling, history fetch, cross local/SSH edge or navigation
+is added. Local monitoring and navigation behavior remain unchanged.
+
 SSH cards can join/create/edit the plugin's existing collections. Associations
 use canonical `ssh:["hostId","threadId"]` keys in the existing `threadIds` array;
 local UUIDs and pre-existing records are unchanged. The picker, card tags, search,
@@ -155,7 +167,8 @@ collections should use this fork rather than an older installed package.
 | Discovery | Existing local index/listing | No verified read-only Desktop SSH listing route |
 | Approvals/answers/execution | Existing local controls | Default denied; explicit per-pair opt-in uses current owner, fixture-tested only |
 | Turn timing | Existing local sources | Validated fields from received snapshot only; cleared on loss |
-| Tokens/input timestamps/Git/artifacts/review/monitoring | Existing local behavior | Unavailable; no remote filesystem interpretation |
+| Wait relationships | Existing local monitoring | Successful latest-turn snapshot evidence between registered live SSH cards only; no active-watcher claim or navigation |
+| Tokens/input timestamps/Git/artifacts/review | Existing local behavior | Unavailable; no remote filesystem interpretation |
 
 ## Source, repository distribution, and installed plugin
 
@@ -180,7 +193,7 @@ collections should use this fork rather than an older installed package.
 - Remote approval/reply execution is default denied and requires explicit
   per-pair process opt-in. Resume, ownership acquisition and unverified
   navigation remain unavailable. Packaging does not perform installation or actions.
-- Remote cards are excluded from local Git reads, artifacts and monitoring links.
+- Remote cards are excluded from local Git reads, artifacts and navigation links.
   Default read-only registrations do not expose actionable approval payloads.
   Existing local operations stay unchanged.
 - No remote history fetching, last-user-message time, token usage, Git or artifacts.
@@ -202,7 +215,11 @@ collections should use this fork rather than an older installed package.
   wire versions, same-ID hosts, owner/revision races, legacy relay denial, async
   start/steer and duplicates. Navigation fixtures cover manual remote link denial,
   duplicate/encoded route keys, absence of a navigable href, side-effect warnings
-  and unchanged local host links. No new live observation or session mutation was performed.
+  and unchanged local host links. Wait-relationship fixtures cover exact same-ID
+  multi-host pairs, partial success, omitted-host semantics, canonical history
+  boundaries, malformed/error results, private-output exclusion, bidirectional
+  disconnect/replacement invalidation and disabled links in the actual source
+  and distribution MCP/UI. No new live observation or session mutation was performed.
 - No session storage reads, security changes, host/plugin installation,
   website deployment, publication, merge, or upstream PR is needed.
 

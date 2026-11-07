@@ -52626,10 +52626,9 @@ ${JSON.stringify(replies)}
   }
 };
 
-// server/ssh-turn-timing.ts
-var milliseconds = (value) => typeof value === "number" && Number.isSafeInteger(value) && value >= 0;
-function sshTurnTiming(state, observedAt) {
-  if (!state || !Number.isFinite(Date.parse(observedAt))) return null;
+// server/ssh-snapshot-turn.ts
+function sshSnapshotTurn(state) {
+  if (!state) return null;
   try {
     if (state.turnHistory?.kind === "canonical") {
       const islands = state.turnHistory.history?.islands;
@@ -52640,11 +52639,22 @@ function sshTurnTiming(state, observedAt) {
       if (lastEntry && typeof (last?.turnId ?? last?.id) !== "string")
         return null;
     }
-    const turns = desktopTurns(state);
-    const turn = turns.at(-1);
     const tail = Array.isArray(state.turns) ? state.turns.at(-1) : null;
-    if (Array.isArray(state.turns) && state.turns.length > 0 && typeof (tail?.turnId ?? tail?.id) !== "string" || !turn)
+    if (Array.isArray(state.turns) && state.turns.length > 0 && typeof (tail?.turnId ?? tail?.id) !== "string")
       return null;
+    return desktopTurns(state).at(-1) ?? null;
+  } catch {
+    return null;
+  }
+}
+
+// server/ssh-turn-timing.ts
+var milliseconds = (value) => typeof value === "number" && Number.isSafeInteger(value) && value >= 0;
+function sshTurnTiming(state, observedAt) {
+  if (!state || !Number.isFinite(Date.parse(observedAt))) return null;
+  try {
+    const turn = sshSnapshotTurn(state);
+    if (!turn) return null;
     const id = turn.turnId ?? turn.id;
     if (typeof id !== "string" || !id.length || !["inProgress", "completed", "interrupted"].includes(turn.status))
       return null;
@@ -52771,6 +52781,113 @@ function sshSessionThread(target, conversation) {
     waitingSince: null,
     waitingQuestion: waiting && !failed ? question : null
   };
+}
+
+// server/ssh-monitoring.ts
+var sshWaitHostSchema = external_exports.string().min(1).max(200);
+var sshWaitArgumentsSchema = external_exports.object({
+  targets: external_exports.array(
+    external_exports.object({
+      threadId: external_exports.uuid(),
+      hostId: sshWaitHostSchema.optional(),
+      afterCursor: external_exports.string().min(1).optional()
+    }).strict()
+  ).min(1).max(8),
+  timeoutMs: external_exports.number().int().min(1).max(12e4).optional()
+}).strict();
+var sshWaitResultSchema = external_exports.object({
+  timedOut: external_exports.boolean(),
+  wake: external_exports.object({}).passthrough().nullable(),
+  polls: external_exports.array(
+    external_exports.object({ thread: external_exports.object({ id: external_exports.uuid(), hostId: sshWaitHostSchema }) })
+  ).max(8)
+});
+function waitTargets(item, source) {
+  if (item?.tool !== "wait_threads" || item.status !== "completed" || item.error != null)
+    return [];
+  let content;
+  let textType;
+  if (item.type === "mcpToolCall" && item.server === "codex_app") {
+    if (item.result?.isError != null && item.result.isError !== false)
+      return [];
+    content = item.result?.content;
+    textType = "text";
+  } else if (item.type === "dynamicToolCall" && item.namespace === "codex_app" && item.success === true) {
+    content = item.contentItems;
+    textType = "inputText";
+  } else return [];
+  const args = sshWaitArgumentsSchema.safeParse(item.arguments);
+  if (!args.success || !Array.isArray(content) || content.length > 50)
+    return [];
+  if (args.data.targets.some((target) => target.threadId === source.id))
+    return [];
+  const parts = content.filter((part) => part?.type === textType);
+  if (parts.length !== 1 || typeof parts[0].text !== "string" || parts[0].text.length > 1048576)
+    return [];
+  try {
+    const result = sshWaitResultSchema.safeParse(JSON.parse(parts[0].text));
+    if (!result.success) return [];
+    const requested = args.data.targets.map(
+      (target) => sessionKey({
+        id: target.threadId,
+        hostId: target.hostId ?? source.hostId
+      })
+    );
+    if (new Set(requested).size !== requested.length) return [];
+    const returned = new Set(
+      result.data.polls.map(
+        (poll) => sessionKey({ id: poll.thread.id, hostId: poll.thread.hostId })
+      )
+    );
+    return requested.filter(
+      (key) => key !== sessionKey(source) && returned.has(key)
+    );
+  } catch {
+    return [];
+  }
+}
+function withSshMonitoring(threads, states) {
+  const current = new Map(
+    threads.filter(
+      (thread) => !isLocalSession(thread) && thread.fresh && thread.kind === "user" && ["active", "idle"].includes(thread.runtime?.type ?? "")
+    ).map((thread) => [sessionKey(thread), thread])
+  );
+  const links = /* @__PURE__ */ new Map();
+  const reference = (thread) => ({
+    id: thread.id,
+    hostId: thread.hostId,
+    title: thread.title
+  });
+  for (const [key, source] of current) {
+    const turn = sshSnapshotTurn(states.get(key));
+    const turnId = turn?.turnId ?? turn?.id;
+    if (!turn || typeof turnId !== "string" || !turnId.length || !["inProgress", "completed", "interrupted"].includes(turn.status))
+      continue;
+    const targets2 = /* @__PURE__ */ new Set();
+    for (const item of turn.items ?? [])
+      for (const target of waitTargets(item, source))
+        if (current.has(target)) targets2.add(target);
+    for (const targetKey of targets2) {
+      const outgoing = links.get(key) ?? { monitoring: [], monitoredBy: [] };
+      const incoming = links.get(targetKey) ?? {
+        monitoring: [],
+        monitoredBy: []
+      };
+      outgoing.monitoring.push(reference(current.get(targetKey)));
+      incoming.monitoredBy.push(reference(source));
+      links.set(key, outgoing);
+      links.set(targetKey, incoming);
+    }
+  }
+  return threads.map((thread) => {
+    if (isLocalSession(thread)) return thread;
+    const relations = links.get(sessionKey(thread));
+    return {
+      ...thread,
+      monitoring: relations?.monitoring ?? [],
+      monitoredBy: relations?.monitoredBy ?? []
+    };
+  });
 }
 
 // shared/types.ts
@@ -53354,29 +53471,33 @@ var StatusBridge = class {
           waitingQuestion: thread.waitingQuestion ?? confirmation?.questions[0]?.question ?? null
         });
       }
+    const sshStates = /* @__PURE__ */ new Map();
     return {
       schemaVersion: 1,
       generatedAt: now(),
       syncingThreads: this.initialSyncRequested && !this.initialSyncComplete && this.connection.state !== "disconnected",
       // Append remote display data only after all local filesystem enrichment.
-      threads: [
-        ...threads.values(),
-        ...this.sshTargets.map((target) => {
-          const thread = sshSessionThread(
-            target,
-            this.connection.state === "connected" ? this.desktop?.get(target.threadId, target.hostId) : void 0
-          );
-          const actionsEnabled = thread.fresh && thread.kind === "user" && ["active", "idle"].includes(thread.runtime?.type ?? "") && !!this.desktop?.remoteActionsAllowed(
-            target.threadId,
-            target.hostId
-          );
-          return {
-            ...thread,
-            observationOnly: !actionsEnabled,
-            remoteActionsEnabled: actionsEnabled
-          };
-        })
-      ].sort(compareByLastUserMessage),
+      threads: withSshMonitoring(
+        [
+          ...threads.values(),
+          ...this.sshTargets.map((target) => {
+            const conversation = this.connection.state === "connected" ? this.desktop?.get(target.threadId, target.hostId) : void 0;
+            const thread = sshSessionThread(target, conversation);
+            if (conversation)
+              sshStates.set(sessionKey(thread), conversation.state);
+            const actionsEnabled = thread.fresh && thread.kind === "user" && ["active", "idle"].includes(thread.runtime?.type ?? "") && !!this.desktop?.remoteActionsAllowed(
+              target.threadId,
+              target.hostId
+            );
+            return {
+              ...thread,
+              observationOnly: !actionsEnabled,
+              remoteActionsEnabled: actionsEnabled
+            };
+          })
+        ],
+        sshStates
+      ).sort(compareByLastUserMessage),
       confirmations,
       connection: { ...this.connection },
       sources: {

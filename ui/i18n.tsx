@@ -21,6 +21,8 @@ const english: Record<string, string> = {
   监听关系: "Monitoring relationships",
   "监听 {title}": "Monitoring {title}",
   "被 {title} 监听": "Monitored by {title}",
+  "曾等待 {title}": "Waited for {title}",
+  "曾被 {title} 等待": "Was waited on by {title}",
   加入合集: "Add to collection",
   "打开合集：{title}": "Open collection: {title}",
   "将对话加入合集：{title}": "Add conversation to collection: {title}",

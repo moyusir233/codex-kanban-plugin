@@ -33,8 +33,11 @@ Extracted files used (SHA256):
 | `webview/assets/async/884779.bf167971f9.js` | `cdc694546dbda438c12a929e692381b1c8c186d4cad9257e69ad5b4163d72d84` |
 | `webview/assets/async/110557.82455d0c53.js` | `b482ebb230fd3580c79da876ad699f0f82cdb47f04eab49a49188fd9c69732a3` |
 | `webview/assets/async/352584.4e31b3db06.js` | `f9eecbd4ae11f154a6f5fe400b71103fbd34dda3e18a4d0a72769108c033167b` |
+| `webview/assets/async/63396.ec0c2499c7.js` | `4b82dc6a50234aa59dadd58e21e335cf333ab6b473163575d0f3c42b442a0412` |
+| `webview/assets/async/652142.46d771a879.js` | `449e3f6270c2ed13183142d0a50cd42de1a50d6fa464d89baa3e98a389b5605a` |
+| `webview/assets/async/11147.784bd085db.js` | `59a5117e86f509825f640589479852e61ca846537718bbbc21a50fc41b6d443b` |
 
-The four additional renderer entries above were checked against ASAR-header
+The seven additional renderer entries above were checked against ASAR-header
 size, SHA256 and per-block SHA256 metadata. This verifies extraction consistency,
 not the whole archive's signature or the user's installed version.
 
@@ -121,6 +124,69 @@ These are viable Desktop-side building blocks. Safe automatic discovery still
 needs an explicitly exported read-only, host-scoped catalog channel or authorized
 executor integration that does not borrow a business/test session's identity.
 No discovery probe or installed app-tools enablement was performed.
+
+### Ordinary MCP App host scope is not a global Desktop tool bridge
+
+Renderer63396 `nI` receives a fixed server (`tu`), host (`M`) and conversation
+(`i`). `te` resolves that named server; `tools/list`, resource list/template
+handlers and `i3` tool dispatch validate the same server's tools and trusted
+scope before host-manager `callMcpTool({threadId, server, tool, ...})`. Supplying
+`codex_app` tool names in an ordinary app request does not select another server
+or yield a global session directory. The optional `mcpAppHostAdapter` is
+host-injected, not an extra capability this fork can assume. Renderer652142's
+standard schemas and connector forwarding do not establish such a catalog.
+
+The `openai/files/open` extension accepts a path in this app's fixed host
+context, not an arbitrary target host parameter. It does not demonstrate a safe
+cross-host artifact API for a board hosted locally. No remote path is submitted
+through it.
+
+Renderer63396's `ui/openai/first-party-plugin-bridge` schema and class `eC` wrap
+an **injected** bridge's `createRpcStub`. The extension is advertised only with
+the bridge and notification sink present. Renderer11147's
+`firstPartyPluginBridgeForServer$` selects a Desktop-owned registration by
+plugin/connector identity, host and installation host, checking remote-host
+support. An unregistered server gets no bridge. The schema's existence is not
+authorization to spoof a first-party plugin or inject this capability. No host
+adapter, bridge, private pipe or catalog call was attempted. This additional
+trace narrows the feasible discovery path; it does not prove every Desktop
+version lacks another supported export.
+
+## Snapshot-only successful wait relationships
+
+Renderer182735 `MCYz` defines `wait_threads` with 1–8 target pairs and an optional
+0–120000 ms timeout. Renderer497066's dispatch resolves an omitted target host
+to `sourceHostId`, rejects duplicate pairs, then routes to the existing host
+managers. This handler also rejects its caller thread ID even on another host;
+the UI fixture uses different caller/target IDs, while colliding each with local
+IDs and testing identical target IDs across SSH hosts in unit fixtures.
+`waitForThreads` returns successful `polls` with explicit
+`thread: {id, hostId, ...}`; failed targets are separate errors. Its `nI`
+serializes the result into `contentItems: [{type: "inputText", text}]` with
+`success: true`. These are existing Desktop tool handlers, not APIs this board
+calls.
+
+bootstrap854 `yx`/`Sb` preserve `mcpToolCall` in conversation snapshots.
+Renderer182735's `er` conversion maps `codex_app` MCP calls to
+`dynamicToolCall` with namespace/tool/arguments/contentItems/status/success.
+The fork accepts only these positive completed shapes; MCP errors and dynamic
+calls without explicit success are rejected. Arguments and result identity are
+bounded/validated, immediate zero-timeout polls are excluded, and requested and
+returned pairs must intersect exactly. Partial successful polls can yield edges
+only for already registered, live, ordinary SSH cards. Titles come from their
+snapshots, never from tool results. No result body or assistant text reaches the
+board. Cross local/SSH relations remain excluded.
+
+This proves a **historical successful wait in the newest received turn**, not
+an ongoing watcher, current activity of the target, completion of that target or
+automatic session discovery. UI labels reflect past evidence. Newest canonical
+history gaps/unbound tails remain unknown; a new turn resets evidence. Loss of
+either endpoint's snapshot/runtime eligibility clears both directions, cache
+restoration clears all SSH edges, and a live replacement can restore them.
+Remote links have no href and cannot call the host. Local readers/references and
+navigation are unchanged. No wait, read, resume, execution or live observation
+was performed to implement or test this graph; fixtures cover source and
+repository-distribution MCP/UI.
 
 ## Snapshot-only turn timing
 
@@ -226,12 +292,13 @@ Reuse the Desktop-owned host services, not a competing backend:
   handling, MCP environment forwarding and source/distribution UI fixtures.
 - **Already implemented:** explicit observation, non-live filtering metadata
   retention, host-safe collections and local filesystem exclusion. Snapshot-only
-  validated turn timing now supplements these without loading history.
+  validated turn timing and historical successful wait relationships now
+  supplement these without loading history.
 - **Unfinished:** supported catalog/host discovery export, installed-version
   and authorized live acceptance, a navigation route with acceptable verified
   effects (known hydration/read/auto-response risks now documented), usage/input
-  timestamps and host-routed Git/artifacts/review/monitoring. **Full parity is not
-  established or implemented by this commit.**
+  timestamps, host-routed Git/artifacts/review and complete cross-host monitoring.
+  **Full parity is not established or implemented by this commit.**
 
 Remote operations have not been tested live. Separate explicit authorization for
 the named test session is needed. Fixtures do not establish support in every

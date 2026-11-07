@@ -10,6 +10,7 @@ import {
   sshSessionThread,
 } from "./ssh-sessions.js";
 import { sessionKey } from "../shared/session-identity.js";
+import { withSshMonitoring } from "./ssh-monitoring.js";
 import { readConfirmations, replyToConfirmation } from "./confirmations.js";
 import type { ConfirmationReply } from "../shared/confirmations.js";
 import {
@@ -766,6 +767,7 @@ export class StatusBridge {
             null,
         });
       }
+    const sshStates = new Map<string, any>();
     return {
       schemaVersion: 1,
       generatedAt: now(),
@@ -774,30 +776,34 @@ export class StatusBridge {
         !this.initialSyncComplete &&
         this.connection.state !== "disconnected",
       // Append remote display data only after all local filesystem enrichment.
-      threads: [
-        ...threads.values(),
-        ...this.sshTargets.map((target) => {
-          const thread = sshSessionThread(
-            target,
-            this.connection.state === "connected"
-              ? this.desktop?.get(target.threadId, target.hostId)
-              : undefined,
-          );
-          const actionsEnabled =
-            thread.fresh &&
-            thread.kind === "user" &&
-            ["active", "idle"].includes(thread.runtime?.type ?? "") &&
-            !!this.desktop?.remoteActionsAllowed(
-              target.threadId,
-              target.hostId,
-            );
-          return {
-            ...thread,
-            observationOnly: !actionsEnabled,
-            remoteActionsEnabled: actionsEnabled,
-          };
-        }),
-      ].sort(compareByLastUserMessage),
+      threads: withSshMonitoring(
+        [
+          ...threads.values(),
+          ...this.sshTargets.map((target) => {
+            const conversation =
+              this.connection.state === "connected"
+                ? this.desktop?.get(target.threadId, target.hostId)
+                : undefined;
+            const thread = sshSessionThread(target, conversation);
+            if (conversation)
+              sshStates.set(sessionKey(thread), conversation.state);
+            const actionsEnabled =
+              thread.fresh &&
+              thread.kind === "user" &&
+              ["active", "idle"].includes(thread.runtime?.type ?? "") &&
+              !!this.desktop?.remoteActionsAllowed(
+                target.threadId,
+                target.hostId,
+              );
+            return {
+              ...thread,
+              observationOnly: !actionsEnabled,
+              remoteActionsEnabled: actionsEnabled,
+            };
+          }),
+        ],
+        sshStates,
+      ).sort(compareByLastUserMessage),
       confirmations,
       connection: { ...this.connection },
       sources: {

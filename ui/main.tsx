@@ -1297,7 +1297,7 @@ function ThreadCard({
           )}
         </p>
       )}
-      {local && <ThreadMonitoring thread={thread} onError={onArtifactError} />}
+      <ThreadMonitoring thread={thread} onError={onArtifactError} />
       {compact && (
         <details className="card-run-details">
           <summary>{t("运行详情")}</summary>

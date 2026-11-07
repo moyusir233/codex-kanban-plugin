@@ -24,6 +24,8 @@ export function cachedSnapshot(snapshot: Snapshot): Snapshot {
             error: null,
             unread: null,
             turnUsage: null,
+            monitoring: [],
+            monitoredBy: [],
           }
         : {}),
       pendingUserInput: false,
@@ -89,6 +91,8 @@ export function reconcileSnapshot(
         error: null,
         unread: null,
         turnUsage: null,
+        monitoring: [],
+        monitoredBy: [],
         fresh: false,
         remoteActionsEnabled: false,
         observationOnly: true,

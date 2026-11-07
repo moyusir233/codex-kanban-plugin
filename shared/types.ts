@@ -24,8 +24,8 @@ export type TurnUsage = {
   tokens: number | null;
   durationMs: number | null;
 };
-/** 监听关系中的对话引用，使用当前标题并按 ID 跳转。 */
-export type ThreadLink = { id: string; title: string };
+/** 监听关系使用当前标题；SSH 引用保留主机身份，不允许跳转。 */
+export type ThreadLink = { id: string; hostId?: string; title: string };
 /** 工作目录当前的 Git 状态；无分支名表示 detached HEAD。 */
 export type GitMetadata = { branch: string | null; isWorktree: boolean };
 export type Thread = {

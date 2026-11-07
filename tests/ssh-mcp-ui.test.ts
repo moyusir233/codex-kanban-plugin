@@ -15,6 +15,11 @@ const id = "00000000-0000-4000-8000-000000000001";
 const agentId = "00000000-0000-4000-8000-000000000002";
 const hostId = "fixture-ssh";
 const remoteKey = sessionKey({ id, hostId });
+const monitorHost = "fixture-monitor-host";
+// Use a different source/target UUID: the traced Desktop wait handler rejects
+// its caller ID even on another host. The target still collides with local 10.
+const monitorId = "00000000-0000-4000-8000-000000000010";
+const monitorKey = sessionKey({ id: monitorId, hostId: monitorHost });
 
 async function until(check: () => boolean | Promise<boolean>) {
   const deadline = Date.now() + 5000;
@@ -111,6 +116,14 @@ for (const { packaged, actions } of [
               },
             ],
             latestTokenUsageInfo: { total: { totalTokens: 987654 } },
+          },
+        ],
+        [
+          monitorKey,
+          {
+            title: "Fixture monitoring target",
+            cwd: "/REMOTE_MONITOR_NOT_LOCAL",
+            threadRuntimeStatus: { type: "idle" },
           },
         ],
         [
@@ -246,6 +259,7 @@ for (const { packaged, actions } of [
         TASKBOARD_SSH_SESSIONS: JSON.stringify([
           { hostId, threadId: id },
           { hostId, threadId: agentId },
+          { hostId: monitorHost, threadId: monitorId },
         ]),
       };
       if (actions)
@@ -428,7 +442,7 @@ for (const { packaged, actions } of [
         ];
         await until(
           () =>
-            cards().length === 18 &&
+            cards().length === 19 &&
             cards().some((card) =>
               card.textContent?.includes("Fixture remote ordinary"),
             ),
@@ -473,6 +487,104 @@ for (const { packaged, actions } of [
           assert.ok(element, selector);
           element.click();
         };
+        // A received successful wait displays exact cross-host graph edges, not
+        // inferred target runtime or an active polling/navigation capability.
+        const monitorCard = () =>
+          cards().find((card) => card.dataset.threadId === monitorKey)!;
+        await until(() => !!monitorCard());
+        const waitItem = {
+          id: "fixture-monitor-wait",
+          type: "dynamicToolCall",
+          namespace: "codex_app",
+          tool: "wait_threads",
+          status: "completed",
+          success: true,
+          arguments: {
+            targets: [{ threadId: monitorId, hostId: monitorHost }],
+            timeoutMs: 55000,
+          },
+          contentItems: [
+            {
+              type: "inputText",
+              text: JSON.stringify({
+                timedOut: true,
+                wake: null,
+                polls: [
+                  {
+                    thread: {
+                      id: monitorId,
+                      hostId: monitorHost,
+                      title: "PRIVATE_RESULT_TITLE",
+                    },
+                    latestAssistantMessage: { text: "PRIVATE_WAIT_OUTPUT" },
+                  },
+                ],
+              }),
+            },
+          ],
+        };
+        states.get(remoteKey).turns[0].items = [waitItem];
+        sendSnapshot(sockets.at(-1)!, id, hostId);
+        const outgoingLink = () =>
+          remoteCard().querySelector<HTMLAnchorElement>(".thread-monitoring a");
+        const incomingLink = () =>
+          monitorCard().querySelector<HTMLAnchorElement>(
+            ".thread-monitoring a",
+          );
+        await until(() => !!outgoingLink() && !!incomingLink());
+        assert.match(outgoingLink()!.textContent!, /曾等待|Waited for/);
+        assert.match(incomingLink()!.textContent!, /曾被|Was waited on by/);
+        assert.ok(
+          outgoingLink()!.textContent?.includes("Fixture monitoring target"),
+        );
+        assert.ok(outgoingLink()!.textContent?.includes(monitorHost));
+        assert.ok(
+          incomingLink()!.textContent?.includes("Fixture remote ordinary"),
+        );
+        assert.equal(outgoingLink()!.getAttribute("href"), null);
+        assert.equal(outgoingLink()!.getAttribute("aria-disabled"), "true");
+        assert.match(outgoingLink()!.title, /SSH navigation is disabled/);
+        assert.ok(!window.document.body.textContent?.includes("PRIVATE_WAIT_"));
+        assert.ok(
+          !window.document.body.textContent?.includes("PRIVATE_RESULT_"),
+        );
+        for (const localId of [id, monitorId])
+          assert.ok(
+            !cards()
+              .find((card) => card.dataset.threadId === localId)!
+              .querySelector(".thread-monitoring"),
+            "Same-ID local thread has no remote graph",
+          );
+        outgoingLink()!.click();
+        await until(
+          () =>
+            !!window.document
+              .querySelector(".toast")
+              ?.textContent?.includes("SSH navigation is disabled"),
+        );
+        assert.deepEqual(openedLinks, []);
+        sockets.at(-1)!.write(
+          frame({
+            type: "broadcast",
+            method: "client-status-changed",
+            params: {
+              clientId: "owner-" + monitorHost,
+              status: "disconnected",
+            },
+          }),
+        );
+        await until(() => !outgoingLink() && !incomingLink());
+        assert.equal(remoteCard().closest(".lane--green") !== null, true);
+        sendSnapshot(sockets.at(-1)!, monitorId, monitorHost);
+        await until(() => !!outgoingLink() && !!incomingLink());
+        const originalTurn = states.get(remoteKey).turns[0];
+        states.get(remoteKey).turns = [
+          { turnId: "fixture-next-turn", status: "inProgress", items: [] },
+        ];
+        sendSnapshot(sockets.at(-1)!, id, hostId);
+        await until(() => !outgoingLink() && !incomingLink());
+        states.get(remoteKey).turns = [{ ...originalTurn, items: [] }];
+        sendSnapshot(sockets.at(-1)!, id, hostId);
         // Exercise actual UI -> MCP -> host-routed owner transport, not just types.
         states.get(remoteKey).requests = [
           {
@@ -600,7 +712,7 @@ for (const { packaged, actions } of [
           click(`[data-key="o:state:${state}"]`);
           await new Promise((ok) => setTimeout(ok, 20));
         }
-        await until(() => cards().length === 18);
+        await until(() => cards().length === 19);
         // Apply the actual UI's project and title filters before snapshot loss.
         await until(
           () => !!window.document.querySelector('[data-key="g:project"]'),
@@ -878,7 +990,7 @@ for (const { packaged, actions } of [
           messages.every(
             (message) =>
               !message.params?.hostId ||
-              ["local", hostId].includes(message.params.hostId),
+              ["local", hostId, monitorHost].includes(message.params.hostId),
           ),
         );
       } finally {

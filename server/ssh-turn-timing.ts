@@ -1,5 +1,5 @@
 import type { TurnUsage } from "../shared/types.js";
-import { desktopTurns } from "./user-input.js";
+import { sshSnapshotTurn } from "./ssh-snapshot-turn.js";
 
 const milliseconds = (value: unknown): value is number =>
   typeof value === "number" && Number.isSafeInteger(value) && value >= 0;
@@ -12,30 +12,8 @@ export function sshTurnTiming(
 ): TurnUsage | null {
   if (!state || !Number.isFinite(Date.parse(observedAt))) return null;
   try {
-    if (state.turnHistory?.kind === "canonical") {
-      const islands = state.turnHistory.history?.islands;
-      // An older search island cannot identify the current/latest turn.
-      if (
-        !Array.isArray(islands) ||
-        islands.at(-1)?.newerBoundary?.status !== "exhausted"
-      )
-        return null;
-      const lastEntry = islands.at(-1)?.entries?.at(-1);
-      const last = state.turnHistory.history?.entitiesByKey?.[lastEntry?.value];
-      if (lastEntry && typeof (last?.turnId ?? last?.id) !== "string")
-        return null;
-    }
-    const turns = desktopTurns(state);
-    const turn = turns.at(-1);
-    const tail = Array.isArray(state.turns) ? state.turns.at(-1) : null;
-    // Do not fall back to a previous turn behind an unbound live placeholder.
-    if (
-      (Array.isArray(state.turns) &&
-        state.turns.length > 0 &&
-        typeof (tail?.turnId ?? tail?.id) !== "string") ||
-      !turn
-    )
-      return null;
+    const turn = sshSnapshotTurn(state);
+    if (!turn) return null;
     const id = turn.turnId ?? turn.id;
     if (
       typeof id !== "string" ||
