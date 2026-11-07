@@ -1,7 +1,8 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { columnFor, needsAttention, type Snapshot } from "../shared/types";
-import { matchesFilters } from "../ui/board-filters";
+import { matchesFilters, matchesQuery } from "../ui/board-filters";
+import { sshSessionThread } from "../server/ssh-sessions";
 import {
   cachedSnapshot,
   clearSnapshotCache,
@@ -420,4 +421,104 @@ test("local metadata failure retains cached local cards without masking a fresh 
   assert.equal(merged.threads[1].hostId, "fixture-ssh");
   assert.equal(merged.threads[1].fresh, true);
   assert.equal(columnFor(merged.threads[1]), "idle");
+});
+
+for (const metadata of [true, false]) {
+  test(
+    "SSH display metadata survives repeated snapshot loss and filters; local metadata=" +
+      metadata,
+    () => {
+      const target = {
+        hostId: "fixture-ssh",
+        threadId: "00000000-0000-4000-8000-000000000001",
+      };
+      const live = sshSessionThread(target, {
+        revision: 1,
+        ownerClientId: "fixture",
+        state: {
+          title: "Release fixture",
+          cwd: "/remote/release",
+          threadRuntimeStatus: {
+            type: "active",
+            activeFlags: ["waitingOnApproval"],
+          },
+          hasUnreadTurn: true,
+        },
+      });
+      const previous = snapshot();
+      previous.threads = [live];
+      const next = snapshot();
+      next.sources.metadata = metadata;
+      next.threads = [sshSessionThread(target)];
+      let merged = reconcileSnapshot(previous, next);
+      for (let i = 0; i < 3; i++) {
+        const thread = merged.threads[0];
+        assert.equal(thread.title, live.title);
+        assert.equal(thread.cwd, live.cwd);
+        assert.equal(thread.project, live.project);
+        assert.equal(thread.fresh, false);
+        assert.equal(thread.runtime, null);
+        assert.equal(thread.runtimeAt, null);
+        assert.equal(thread.unread, null);
+        assert.equal(thread.pendingUserInput, false);
+        assert.equal(columnFor(thread), "unknown");
+        assert.deepEqual(merged.confirmations?.requests, []);
+        assert.ok(matchesFilters(thread, { project: [live.project] }));
+        assert.ok(matchesQuery(thread, "Release fixture"));
+        merged = reconcileSnapshot(merged, next);
+      }
+      const restored = snapshot();
+      restored.threads = [
+        {
+          ...live,
+          title: "Updated release",
+          cwd: "/remote/new",
+          project: "fixture-ssh · /remote/new",
+          runtime: { type: "idle" },
+        },
+      ];
+      const fresh = reconcileSnapshot(merged, restored).threads[0];
+      assert.equal(fresh.title, "Updated release");
+      assert.equal(fresh.cwd, "/remote/new");
+      assert.equal(columnFor(fresh), "idle");
+      // Same thread ID on another host must never inherit the old title/project.
+      next.threads = [
+        sshSessionThread({ ...target, hostId: "different-host" }),
+      ];
+      assert.notEqual(
+        reconcileSnapshot(previous, next).threads[0].title,
+        live.title,
+      );
+      next.threads = [];
+      next.sources.metadata = true;
+      assert.deepEqual(reconcileSnapshot(previous, next).threads, []);
+      const cached = cachedSnapshot(previous);
+      assert.equal(cached.threads[0].runtime, null);
+      assert.deepEqual(cached.confirmations, {
+        available: false,
+        requests: [],
+      });
+    },
+  );
+}
+
+test("observed remote subagents stay excluded while their snapshots are unavailable", () => {
+  const target = {
+    hostId: "fixture-ssh",
+    threadId: "00000000-0000-4000-8000-000000000001",
+  };
+  const previous = snapshot();
+  previous.threads = [
+    sshSessionThread(target, {
+      revision: 1,
+      ownerClientId: "fixture",
+      state: { source: { subAgent: { parentThreadId: "parent" } } },
+    }),
+  ];
+  const next = snapshot();
+  next.threads = [sshSessionThread(target)];
+  assert.equal(
+    matchesFilters(reconcileSnapshot(previous, next).threads[0], {}),
+    false,
+  );
 });

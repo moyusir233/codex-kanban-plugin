@@ -4,6 +4,12 @@
 
 A workspace for local Codex conversations, collections, and historical usage reviews.
 
+> **This fork:** experimental read-only SSH observation is documented in
+> [SSH-SESSIONS.md](SSH-SESSIONS.md). `npm run build` builds the source in `dist/`;
+> `npm run package:plugin` rebuilds the repository distribution in `plugins/`
+> and offline artifacts in `releases/`. Neither updates an installed plugin.
+> The upstream installation instructions below do not install this fork.
+
 ## Quick Start
 
 ### Install

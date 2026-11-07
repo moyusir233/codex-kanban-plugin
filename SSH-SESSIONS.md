@@ -33,6 +33,9 @@ Supply exact desktop host IDs and existing UUIDs yourself. This is a process
 environment variable, not a persisted desktop or installed plugin change.
 It defaults to no remote targets; maximum 50 pairs; malformed input fails
 startup. The example configures a target, not authorization for live testing.
+Registration declares an ordinary session for display, not a verified runtime
+state. A snapshot identifying a subagent overrides that classification and
+keeps it out of ordinary-session filters. Unregistered broadcasts are ignored.
 
 Opening the fork board leases observation of configured targets. The UI
 renews visible/candidate subscriptions; hidden/closed views release them
@@ -46,6 +49,29 @@ Cards display host, title, literal remote cwd, supported runtime/flags, and
 available model/mode/goal/unread metadata. Missing fields remain unknown.
 Local schema v1 and omitted host IDs stay compatible. Remote IPC/cache/React
 identities use `(hostId, threadId)`. Remote paths are never local paths.
+After snapshot loss, the UI retains only the previous title, cwd, project,
+and kind as non-live filter metadata for the same registered host/thread pair.
+Runtime, freshness, unread and pending-confirmation state are invalidated.
+This keeps project/title-filtered observation candidates eligible for recovery;
+a new live snapshot replaces the cached metadata.
+
+## Source, repository distribution, and installed plugin
+
+- `npm run build` builds the fork source into ignored `dist/` files.
+- `npm run package:plugin` additionally rebuilds the checked-in self-contained
+  `plugins/codex-kanban-plugin/runtime/` bundle, its MCP config and docs, and
+  ignored offline marketplace/ZIP files under `releases/`. It does not install
+  or publish anything. The runtime’s `TASKBOARD_BUILD_ID` hashes server bytes,
+  UI bytes and icon bytes; provenance tests check those bytes, source UI parity,
+  startup allowlists and offline artifact parity.
+- Source and repository-distribution `.mcp.json` explicitly forward
+  `TASKBOARD_SSH_SESSIONS` from the executor environment. Startup fixtures use
+  those actual configs and shell arguments, not an injected transport bypass.
+- The checkout’s marketplace catalog points at the fork’s
+  `feat/ssh-session-observer`, not upstream `main`. Existing installed plugin
+  processes and saved marketplace refs are untouched; they still run their
+  previously installed code. The upstream install examples in the README are
+  not instructions to install this fork.
 
 ## Safety and unfinished work
 
@@ -62,6 +88,9 @@ identities use `(hostId, threadId)`. Remote paths are never local paths.
   Snapshot availability depends on the desktop owner. Automatic discovery
   needs a verified read-only listing capability and host-routed transport.
 - Tests use synthetic Unix sockets, temporary databases, and browser host
-  fixtures. No new live observation or session mutation was performed.
+  fixtures, including the real built UI in a synthetic DOM connected to MCP
+  subprocesses launched from source/distribution configs. Nested/non-scalar
+  patch path regressions reject property-key coercion before patch application.
+  No new live observation or session mutation was performed.
 - No session storage reads, security changes, host/plugin installation,
   website deployment, publication, merge, or upstream PR is needed.

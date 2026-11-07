@@ -14,6 +14,9 @@ export function cachedSnapshot(snapshot: Snapshot): Snapshot {
         ? (thread.cachedColumn ?? columnFor(thread))
         : "unknown",
       fresh: false,
+      ...(!isLocalSession(thread)
+        ? { runtime: null, runtimeAt: null, error: null, unread: null }
+        : {}),
       pendingUserInput: false,
       waitingQuestion: null,
       waitingSince: null,
@@ -43,7 +46,7 @@ export function reconcileSnapshot(
       ...next,
       threads: previous.threads.filter(isLocalSession),
     });
-    return {
+    next = {
       ...next,
       cached: true,
       threads: [
@@ -59,6 +62,29 @@ export function reconcileSnapshot(
   );
   const threads: Snapshot["threads"] = next.threads.map((thread) => {
     const { cachedColumn: _cached, ...current } = thread;
+    if (!isLocalSession(thread) && !thread.fresh) {
+      const old = known.get(sessionKey(thread));
+      return {
+        ...current,
+        // Retain only display metadata for filters and recovery, never live state.
+        ...(old
+          ? {
+              title: old.title,
+              cwd: old.cwd,
+              project: old.project,
+              kind: old.kind,
+            }
+          : {}),
+        runtime: null,
+        runtimeAt: null,
+        error: null,
+        unread: null,
+        fresh: false,
+        pendingUserInput: false,
+        waitingSince: null,
+        waitingQuestion: null,
+      };
+    }
     if (thread.fresh || thread.runtime?.type === "notLoaded") return current;
     if (!isLocalSession(thread)) return current;
     const old = known.get(sessionKey(thread));

@@ -646,44 +646,71 @@ test("remote revision gaps and owner disconnects invalidate only their host/thre
   }
 });
 
-test("remote patches cannot traverse prototype properties", async () => {
+test("remote patches reject dangerous keys and non-scalar paths before property coercion", async () => {
   const f = await fixture();
   try {
     f.client.watch([{ hostId: remoteHost, threadId: thread }]);
     f.client.start();
     await until(() => f.messages.some((m) => m.params?.following));
-    f.send({
-      type: "broadcast",
-      method: "thread-stream-state-changed",
-      version: 11,
-      sourceClientId: "remote-owner",
-      params: {
-        hostId: remoteHost,
-        conversationId: thread,
-        change: { type: "snapshot", revision: 1, conversationState: {} },
-      },
-    });
-    await until(() => !!f.client.get(thread, remoteHost));
-    f.send({
-      type: "broadcast",
-      method: "thread-stream-state-changed",
-      version: 11,
-      sourceClientId: "remote-owner",
-      params: {
-        hostId: remoteHost,
-        conversationId: thread,
-        change: {
-          type: "patches",
-          baseRevision: 1,
-          revision: 2,
-          patches: [
-            { op: "add", path: ["__proto__", "kanbanPolluted"], value: true },
-          ],
+    const snapshot = () =>
+      f.send({
+        type: "broadcast",
+        method: "thread-stream-state-changed",
+        version: 11,
+        sourceClientId: "remote-owner",
+        params: {
+          hostId: remoteHost,
+          conversationId: thread,
+          change: {
+            type: "snapshot",
+            revision: 1,
+            conversationState: { safe: {} },
+          },
         },
-      },
-    });
-    await until(() => !f.client.get(thread, remoteHost));
-    assert.equal(({} as any).kanbanPolluted, undefined);
+      });
+    for (const path of [
+      ["__proto__", "kanbanPolluted"],
+      ["prototype"],
+      ["safe", "__proto__"],
+      ["safe", "constructor"],
+      ["constructor", "prototype", "kanbanPolluted"],
+      [["__proto__"], "kanbanPolluted"],
+      [["safe"], "field"],
+      [[["constructor"]], "prototype", "kanbanPolluted"],
+      ["safe", ["__proto__"]],
+      ["safe", { key: "constructor" }],
+      ["safe", null],
+      ["safe", true],
+      ["safe", -1],
+      ["safe", 0.5],
+      ["safe", Number.MAX_SAFE_INTEGER + 1],
+      ["safe", Infinity],
+    ]) {
+      snapshot();
+      await until(() => !!f.client.get(thread, remoteHost));
+      const follows = f.messages.filter((m) => m.params?.following).length;
+      f.send({
+        type: "broadcast",
+        method: "thread-stream-state-changed",
+        version: 11,
+        sourceClientId: "remote-owner",
+        params: {
+          hostId: remoteHost,
+          conversationId: thread,
+          change: {
+            type: "patches",
+            baseRevision: 1,
+            revision: 2,
+            patches: [{ op: "add", path, value: true }],
+          },
+        },
+      });
+      await until(() => !f.client.get(thread, remoteHost));
+      assert.equal(({} as any).kanbanPolluted, undefined);
+      await until(
+        () => f.messages.filter((m) => m.params?.following).length > follows,
+      );
+    }
   } finally {
     await f.close();
   }

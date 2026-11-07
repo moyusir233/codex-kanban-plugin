@@ -379,7 +379,15 @@ export class DesktopIpc {
 function applyPatches(state: any, patches: any[]): any {
   if (!Array.isArray(patches)) throw new Error("invalid-desktop-patches");
   for (const { op, path, value } of patches) {
-    if (!Array.isArray(path)) throw new Error("invalid-desktop-patch-path");
+    if (
+      !Array.isArray(path) ||
+      !path.every(
+        (key) =>
+          typeof key === "string" ||
+          (typeof key === "number" && Number.isSafeInteger(key) && key >= 0),
+      )
+    )
+      throw new Error("invalid-desktop-patch-path");
     if (
       path.some((key) =>
         ["__proto__", "prototype", "constructor"].includes(key),

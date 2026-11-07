@@ -19,6 +19,7 @@ for (const path of [
   "assets/icon.svg",
   "README.md",
   "README.zh.md",
+  "SSH-SESSIONS.md",
   "LICENSE",
 ]) {
   await cp(resolve(root, path), resolve(plugin, path), { recursive: true });

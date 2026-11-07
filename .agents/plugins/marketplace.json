@@ -8,9 +8,9 @@
       "name": "codex-kanban-plugin",
       "source": {
         "source": "git-subdir",
-        "url": "https://github.com/jingchengyin/codex-kanban-plugin.git",
+        "url": "https://github.com/moyusir233/codex-kanban-plugin.git",
         "path": "./plugins/codex-kanban-plugin",
-        "ref": "main"
+        "ref": "feat/ssh-session-observer"
       },
       "policy": {
         "installation": "AVAILABLE",

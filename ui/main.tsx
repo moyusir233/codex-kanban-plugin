@@ -374,10 +374,7 @@ function Board() {
   );
   // 看板统计和项目选项也只包含普通对话。
   const boardThreads = useMemo(
-    () =>
-      threads.filter(
-        (thread) => thread.kind === "user" || !isLocalSession(thread),
-      ),
+    () => threads.filter((thread) => thread.kind === "user"),
     [threads],
   );
   const itemsByThread = useMemo(() => {

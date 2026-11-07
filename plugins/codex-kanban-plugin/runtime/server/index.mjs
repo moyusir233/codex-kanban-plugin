@@ -51782,6 +51782,16 @@ var GitMetadataReader = class {
 import { randomUUID } from "node:crypto";
 import { createConnection } from "node:net";
 import { join as join3 } from "node:path";
+
+// shared/session-identity.ts
+function isLocalSession(session) {
+  return session.hostId === void 0 || session.hostId === "local";
+}
+function sessionKey(session) {
+  return isLocalSession(session) ? session.id : `ssh:${JSON.stringify([session.hostId, session.id])}`;
+}
+
+// server/desktop-ipc.ts
 var ownerMethods = /* @__PURE__ */ new Set([
   "thread-follower-command-approval-decision",
   "thread-follower-file-approval-decision",
@@ -51800,7 +51810,7 @@ var DesktopIpc = class {
   stopped = true;
   clientId;
   retry;
-  watched = /* @__PURE__ */ new Set();
+  watched = /* @__PURE__ */ new Map();
   conversations = /* @__PURE__ */ new Map();
   pending = /* @__PURE__ */ new Map();
   /** 只连接现有 socket，不创建路由器或启动新的 Codex 后端。 */
@@ -51813,7 +51823,8 @@ var DesktopIpc = class {
   stop() {
     this.stopped = true;
     clearTimeout(this.retry);
-    if (this.clientId) for (const id of this.watched) this.follow(id, false);
+    if (this.clientId)
+      for (const target of this.watched.values()) this.follow(target, false);
     const socket = this.socket;
     this.socket = void 0;
     this.clientId = void 0;
@@ -51823,21 +51834,35 @@ var DesktopIpc = class {
   }
   /** 只保留调用方当前需要的对话，取消订阅后立即撤下旧确认状态。 */
   watch(threadIds) {
-    const next = new Set(threadIds);
-    for (const id of this.watched)
-      if (!next.has(id)) {
-        this.follow(id, false);
-        this.invalidate(id);
+    const next = new Map(
+      threadIds.map((value) => {
+        const target = typeof value === "string" ? { hostId: "local", threadId: value } : value;
+        return [
+          sessionKey({ id: target.threadId, hostId: target.hostId }),
+          target
+        ];
+      })
+    );
+    for (const [key, target] of this.watched)
+      if (!next.has(key)) {
+        this.follow(target, false);
+        this.invalidate(key);
       }
-    for (const id of next) if (!this.watched.has(id)) this.follow(id, true);
+    for (const [key, target] of next)
+      if (!this.watched.has(key)) this.follow(target, true);
     this.watched = next;
   }
-  get(threadId) {
-    return this.conversations.get(threadId);
+  get(threadId, hostId = "local") {
+    return this.conversations.get(sessionKey({ id: threadId, hostId }));
   }
   /** 用户明确作答后才转给当前 owner；路由成功不代表原请求已完成。 */
-  requestOwner(threadId, method, params) {
-    const conversation = this.conversations.get(threadId);
+  requestOwner(threadId, method, params, hostId = "local") {
+    const parameterHost = params.hostId;
+    if (hostId !== "local" || parameterHost !== void 0 && parameterHost !== "local")
+      return Promise.reject(
+        new Error("SSH sessions are observation-only; actions are disabled.")
+      );
+    const conversation = this.get(threadId);
     if (!conversation || !this.clientId)
       return Promise.reject(
         new Error("\u8BE5\u5BF9\u8BDD\u7684\u684C\u9762\u8FDE\u63A5\u5DF2\u5931\u6548\uFF0C\u8BF7\u5237\u65B0\u540E\u91CD\u8BD5\u3002")
@@ -51879,7 +51904,7 @@ var DesktopIpc = class {
           throw new Error("Codex \u684C\u9762\u8FD4\u56DE\u4E86\u65E0\u6548\u7684\u8FDE\u63A5\u8EAB\u4EFD\u3002");
         this.clientId = result.clientId;
         this.options.onState("connected");
-        for (const id of this.watched) this.follow(id, true);
+        for (const target of this.watched.values()) this.follow(target, true);
       }).catch(() => lose());
     });
     socket.on("data", (data) => {
@@ -51939,14 +51964,18 @@ var DesktopIpc = class {
     });
   }
   /** 只声明观察关系，不请求恢复对话，也不取得执行所有权。 */
-  follow(threadId, following) {
+  follow(target, following) {
     if (!this.clientId) return;
     this.send({
       type: "broadcast",
       method: "thread-stream-following-changed",
       sourceClientId: this.clientId,
       version: 1,
-      params: { conversationId: threadId, hostId: "local", following }
+      params: {
+        conversationId: target.threadId,
+        hostId: target.hostId,
+        following
+      }
     });
   }
   /** 接收原窗口快照与顺序增量，原窗口离开后立即撤销其旧状态。 */
@@ -51981,58 +52010,67 @@ var DesktopIpc = class {
     }
     if (message.method === "ipc-connection-reset") {
       this.invalidateAll();
-      for (const id2 of this.watched) this.follow(id2, true);
+      for (const target2 of this.watched.values()) this.follow(target2, true);
       return;
     }
     if (message.method === "thread-stream-following-status-requested") {
       const { conversationId, hostId: hostId2 } = message.params ?? {};
-      if (message.version === 1 && hostId2 === "local" && this.watched.has(conversationId))
-        this.follow(conversationId, true);
+      const target2 = this.watched.get(
+        sessionKey({ id: conversationId, hostId: hostId2 })
+      );
+      if (message.version === 1 && typeof hostId2 === "string" && target2)
+        this.follow(target2, true);
       return;
     }
     if (message.method !== "thread-stream-state-changed") return;
     const { conversationId: id, hostId, change } = message.params ?? {};
-    if (hostId !== "local" || !this.watched.has(id)) return;
-    if (message.version !== 11)
+    if (typeof id !== "string" || typeof hostId !== "string") return;
+    const key = sessionKey({ id, hostId });
+    const target = this.watched.get(key);
+    if (!target) return;
+    if (message.version !== 11) {
+      if (hostId !== "local") {
+        this.invalidate(key);
+        return;
+      }
       throw new Error("unsupported-desktop-state-version");
+    }
     if (typeof message.sourceClientId !== "string") return;
-    const current = this.conversations.get(id);
+    const current = this.conversations.get(key);
     if (change?.type === "snapshot") {
       if (!change.conversationState || !Number.isInteger(change.revision))
         return;
       if (current && current.ownerClientId !== message.sourceClientId)
-        this.invalidate(id);
+        this.invalidate(key);
       const value = {
         state: change.conversationState,
         ownerClientId: message.sourceClientId,
         revision: change.revision
       };
-      this.conversations.set(id, value);
-      this.options.onConversation(id, value);
+      this.conversations.set(key, value);
+      this.options.onConversation(id, value, hostId);
       return;
     }
     if (change?.type !== "patches" || !current) return;
     if (current.ownerClientId !== message.sourceClientId || current.revision !== change.baseRevision || !Number.isInteger(change.revision) || change.revision <= current.revision) {
-      this.invalidate(id);
-      this.follow(id, true);
+      this.invalidate(key);
+      this.follow(target, true);
       return;
     }
     try {
       current.state = applyPatches(current.state, change.patches);
       current.revision = change.revision;
-      this.options.onConversation(id, current);
+      this.options.onConversation(id, current, hostId);
     } catch {
-      this.invalidate(id);
-      this.follow(id, true);
+      this.invalidate(key);
+      this.follow(target, true);
     }
   }
-  invalidate(threadId) {
-    if (this.conversations.delete(threadId))
-      this.options.onUnavailable(threadId);
-    this.rejectPending(
-      new Error("\u5BF9\u8BDD\u539F\u7A97\u53E3\u8FDE\u63A5\u5DF2\u5931\u6548\uFF0C\u8BF7\u5237\u65B0\u540E\u91CD\u8BD5\u3002"),
-      threadId
-    );
+  invalidate(key) {
+    const target = this.watched.get(key);
+    if (this.conversations.delete(key) && target)
+      this.options.onUnavailable(target.threadId, target.hostId);
+    this.rejectPending(new Error("\u5BF9\u8BDD\u539F\u7A97\u53E3\u8FDE\u63A5\u5DF2\u5931\u6548\uFF0C\u8BF7\u5237\u65B0\u540E\u91CD\u8BD5\u3002"), key);
   }
   invalidateAll() {
     for (const id of this.conversations.keys()) this.invalidate(id);
@@ -52049,7 +52087,14 @@ var DesktopIpc = class {
 function applyPatches(state, patches) {
   if (!Array.isArray(patches)) throw new Error("invalid-desktop-patches");
   for (const { op, path, value } of patches) {
-    if (!Array.isArray(path)) throw new Error("invalid-desktop-patch-path");
+    if (!Array.isArray(path) || !path.every(
+      (key2) => typeof key2 === "string" || typeof key2 === "number" && Number.isSafeInteger(key2) && key2 >= 0
+    ))
+      throw new Error("invalid-desktop-patch-path");
+    if (path.some(
+      (key2) => ["__proto__", "prototype", "constructor"].includes(key2)
+    ))
+      throw new Error("unsafe-desktop-patch-path");
     if (!path.length) {
       if (op !== "replace") throw new Error("invalid-desktop-root-patch");
       state = value;
@@ -52501,6 +52546,73 @@ ${JSON.stringify(replies)}
   }
 };
 
+// server/ssh-sessions.ts
+var targets = external_exports.array(
+  external_exports.object({
+    hostId: external_exports.string().min(1).max(200).refine((id) => id !== "local"),
+    threadId: external_exports.uuid()
+  }).strict()
+).max(50);
+function sshSessionTargets(value) {
+  if (value === void 0) return [];
+  const parsed = targets.parse(JSON.parse(value));
+  return [
+    ...new Map(
+      parsed.map((target) => [
+        sessionKey({ id: target.threadId, hostId: target.hostId }),
+        target
+      ])
+    ).values()
+  ];
+}
+function sshSessionThread(target, conversation) {
+  const state = conversation?.state;
+  const collaboration = state?.latestCollaborationMode?.mode ?? state?.latestCollaborationMode;
+  const rawStatus = state?.threadRuntimeStatus;
+  const runtime = rawStatus && ["active", "idle", "notLoaded", "systemError"].includes(rawStatus.type) ? {
+    type: rawStatus.type,
+    ...Array.isArray(rawStatus.activeFlags) ? {
+      activeFlags: rawStatus.activeFlags.filter(
+        (flag) => typeof flag === "string"
+      )
+    } : {}
+  } : null;
+  const cwd = typeof state?.cwd === "string" ? state.cwd : "";
+  const timestamp2 = typeof state?.updatedAt === "number" && Number.isFinite(state.updatedAt) ? new Date(state.updatedAt) : null;
+  return {
+    id: target.threadId,
+    hostId: target.hostId,
+    observationOnly: true,
+    title: typeof state?.title === "string" ? state.title : target.threadId,
+    cwd,
+    project: `${target.hostId} \xB7 ${cwd || "Remote project unknown"}`,
+    git: null,
+    updatedAt: timestamp2 && !Number.isNaN(timestamp2.getTime()) ? timestamp2.toISOString() : "",
+    lastUserMessageAt: null,
+    kind: state?.source?.subAgent ? "agent" : "user",
+    model: typeof state?.latestModel === "string" ? state.latestModel : null,
+    reasoningEffort: typeof state?.latestReasoningEffort === "string" ? state.latestReasoningEffort : null,
+    collaborationMode: ["plan", "default"].includes(collaboration) ? collaboration : null,
+    goalStatus: [
+      "active",
+      "paused",
+      "blocked",
+      "usageLimited",
+      "budgetLimited",
+      "complete"
+    ].includes(state?.threadGoal?.status) ? state.threadGoal.status : null,
+    turnUsage: null,
+    unread: typeof state?.hasUnreadTurn === "boolean" ? state.hasUnreadTurn : null,
+    runtime,
+    runtimeAt: conversation ? (/* @__PURE__ */ new Date()).toISOString() : null,
+    fresh: !!conversation,
+    error: null,
+    pendingUserInput: false,
+    waitingSince: null,
+    waitingQuestion: null
+  };
+}
+
 // shared/types.ts
 function compareByLastUserMessage(a, b) {
   return (b.lastUserMessageAt ?? "").localeCompare(a.lastUserMessageAt ?? "") || a.id.localeCompare(b.id);
@@ -52555,7 +52667,11 @@ var StatusBridge = class {
   initialSyncComplete = false;
   endpoint;
   home;
+  sshTargets;
   constructor(options = {}) {
+    this.sshTargets = sshSessionTargets(
+      options.sshSessions ?? process.env.TASKBOARD_SSH_SESSIONS
+    );
     this.home = options.home ?? process.env.CODEX_HOME ?? `${homedir()}/.codex`;
     const websocket = options.endpoint ?? process.env.TASKBOARD_WS_URL;
     this.endpoint = websocket ? localEndpoint(websocket) : `ipc://${join4(this.home, "ipc", "ipc.sock")}`;
@@ -52572,8 +52688,11 @@ var StatusBridge = class {
           this.state(state, message ?? null);
           if (state === "connected") this.initialSyncComplete = true;
         },
-        onConversation: (id, value) => this.rememberDesktop(id, value),
-        onUnavailable: (id) => {
+        onConversation: (id, value, hostId) => {
+          if (hostId === "local") this.rememberDesktop(id, value);
+        },
+        onUnavailable: (id, hostId) => {
+          if (hostId !== "local") return;
           this.userInput.delete(id);
           this.modes.delete(id);
           const runtime = this.runtime.get(id);
@@ -52602,7 +52721,15 @@ var StatusBridge = class {
   /** UI 心跳续租当前观察集合，宿主直接销毁面板后也会自动退订。 */
   observeDesktop(threadIds) {
     if (!this.desktop) return;
-    this.desktop.watch(threadIds);
+    const remote = new Map(
+      this.sshTargets.map((target) => [
+        sessionKey({ id: target.threadId, hostId: target.hostId }),
+        target
+      ])
+    );
+    this.desktop.watch(
+      threadIds.filter((id) => !id.startsWith("ssh:") || remote.has(id)).map((id) => remote.get(id) ?? id)
+    );
     clearTimeout(this.observationLease);
     if (threadIds.length) {
       this.observationLease = setTimeout(() => this.desktop?.watch([]), 15e3);
@@ -52939,9 +53066,12 @@ var StatusBridge = class {
     this.initialSyncRequested = true;
     const data = await this.snapshot(selection, observedThreadIds);
     if (this.desktop && observedThreadIds === void 0)
-      this.observeDesktop(
-        data.threads.filter((thread) => thread.kind === "user").slice(0, 15).map((thread) => thread.id)
-      );
+      this.observeDesktop([
+        ...data.threads.filter((thread) => thread.hostId === void 0).filter((thread) => thread.kind === "user").slice(0, 15).map((thread) => thread.id),
+        ...this.sshTargets.map(
+          (target) => sessionKey({ id: target.threadId, hostId: target.hostId })
+        )
+      ]);
     else this.beginInitialSync();
     return data;
   }
@@ -53048,7 +53178,16 @@ var StatusBridge = class {
       schemaVersion: 1,
       generatedAt: now(),
       syncingThreads: this.initialSyncRequested && !this.initialSyncComplete && this.connection.state !== "disconnected",
-      threads: [...threads.values()].sort(compareByLastUserMessage),
+      // Append remote display data only after all local filesystem enrichment.
+      threads: [
+        ...threads.values(),
+        ...this.sshTargets.map(
+          (target) => sshSessionThread(
+            target,
+            this.connection.state === "connected" ? this.desktop?.get(target.threadId, target.hostId) : void 0
+          )
+        )
+      ].sort(compareByLastUserMessage),
       confirmations,
       connection: { ...this.connection },
       sources: {
@@ -54579,7 +54718,7 @@ var handle = serveStdio(
         ...base,
         inputSchema: external_exports.object({
           unreadSelection: external_exports.string().max(400).nullable().optional(),
-          observedThreadIds: external_exports.array(external_exports.string().min(1).max(200)).max(500).optional()
+          observedThreadIds: external_exports.array(external_exports.string().min(1).max(2e3)).max(500).optional()
         }),
         title: "\u5237\u65B0\u770B\u677F",
         description: "\u53EA\u8BFB\u83B7\u53D6\u672C\u5730\u5BF9\u8BDD\u72B6\u6001\u5FEB\u7167\uFF1B\u53EF\u6307\u5B9A\u7528\u6237\u9009\u4E2D\u7684\u672A\u8BFB\u6765\u6E90\uFF0C\u4E0D\u6267\u884C\u4EFB\u52A1\u3001\u4E0D\u56DE\u7B54\u5BA1\u6279\u3001\u4E0D\u4FEE\u6539\u5DF2\u8BFB\u72B6\u6001\u3002",

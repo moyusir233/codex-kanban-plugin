@@ -32,12 +32,15 @@ export function sshSessionTargets(value: string | undefined): SessionTarget[] {
   ];
 }
 
-/** Metadata is display-only. Never stat, resolve, or run Git against remote cwd. */
+/** Map only explicitly registered ordinary sessions; observed subagents stay excluded.
+ * Metadata is display-only. Never stat, resolve, or run Git against remote cwd. */
 export function sshSessionThread(
   target: SessionTarget,
   conversation?: DesktopConversation,
 ): Thread {
   const state = conversation?.state;
+  const collaboration =
+    state?.latestCollaborationMode?.mode ?? state?.latestCollaborationMode;
   const rawStatus = state?.threadRuntimeStatus;
   const runtime =
     rawStatus &&
@@ -71,16 +74,14 @@ export function sshSessionThread(
         ? timestamp.toISOString()
         : "",
     lastUserMessageAt: null,
-    kind: state?.source?.subAgent ? "agent" : "unknown",
+    kind: state?.source?.subAgent ? "agent" : "user",
     model: typeof state?.latestModel === "string" ? state.latestModel : null,
     reasoningEffort:
       typeof state?.latestReasoningEffort === "string"
         ? state.latestReasoningEffort
         : null,
-    collaborationMode: ["plan", "default"].includes(
-      state?.latestCollaborationMode,
-    )
-      ? state.latestCollaborationMode
+    collaborationMode: ["plan", "default"].includes(collaboration)
+      ? collaboration
       : null,
     goalStatus: [
       "active",
