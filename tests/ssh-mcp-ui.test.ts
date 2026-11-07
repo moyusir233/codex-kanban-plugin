@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { createServer, type Socket } from "node:net";
-import { cp, mkdir, mkdtemp, readFile, rm } from "node:fs/promises";
+import { cp, mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { DatabaseSync } from "node:sqlite";
@@ -34,19 +34,48 @@ function frame(message: object) {
 for (const packaged of [false, true]) {
   test(
     (packaged ? "repository distribution" : "source build") +
-      " MCP config forwards SSH opt-in and renders ordinary cards but not subagents",
-    { timeout: 30000 },
+      " MCP/UI observes SSH through filtered reconnects and host-safe collections",
+    { timeout: 60000 },
     async () => {
       const home = await mkdtemp(join(tmpdir(), "kanban-ssh-ui-"));
       const codexHome = join(home, "codex");
       await mkdir(join(codexHome, "ipc"), { recursive: true });
       const database = new DatabaseSync(join(codexHome, "state_5.sqlite"));
       database.exec(
-        "CREATE TABLE threads(id TEXT, title TEXT, cwd TEXT, updated_at INTEGER, source TEXT, thread_source TEXT, archived INTEGER)",
+        "CREATE TABLE threads(id TEXT, title TEXT, cwd TEXT, rollout_path TEXT, updated_at INTEGER, source TEXT, thread_source TEXT, archived INTEGER)",
       );
       database
-        .prepare("INSERT INTO threads VALUES(?,?,?,?,?,?,?)")
-        .run(id, "Fixture local", home, 1800000000, "vscode", "user", 0);
+        .prepare("INSERT INTO threads VALUES(?,?,?,?,?,?,?,?)")
+        .run(id, "Fixture local", home, null, 1800000000, "vscode", "user", 0);
+      const newerLocals: string[] = [];
+      for (let i = 10; i < 26; i++) {
+        const localId = `00000000-0000-4000-8000-${String(i).padStart(12, "0")}`;
+        newerLocals.push(localId);
+        const path = join(home, `fixture-${i}.jsonl`);
+        await writeFile(
+          path,
+          JSON.stringify({
+            timestamp: "2026-11-07T00:00:00.000Z",
+            type: "event_msg",
+            payload: {
+              type: "user_message",
+              message: "Fixture newer local input",
+            },
+          }) + "\n",
+        );
+        database
+          .prepare("INSERT INTO threads VALUES(?,?,?,?,?,?,?,?)")
+          .run(
+            localId,
+            `Newer local ${i}`,
+            home,
+            path,
+            1800000000 + i,
+            "vscode",
+            "user",
+            0,
+          );
+      }
       database.close();
 
       const messages: any[] = [];
@@ -78,6 +107,12 @@ for (const packaged of [false, true]) {
           },
         ],
       ]);
+      for (const localId of newerLocals)
+        states.set(localId, {
+          title: "Newer local",
+          cwd: home,
+          threadRuntimeStatus: { type: "idle" },
+        });
       const revisions = new Map<string, number>();
       let respondToFollows = true;
       const sendSnapshot = (socket: Socket, threadId: string, host: string) => {
@@ -195,6 +230,19 @@ for (const packaged of [false, true]) {
             ).length === 2,
         );
         const snapshot = await readSnapshot();
+        const saved = await client.callTool({
+          name: "taskboard_work_item_save",
+          arguments: {
+            title: "Fixture collection",
+            description: "",
+            status: "planned",
+            threadIds: [id],
+            checklist: [],
+            links: [],
+          },
+        });
+        assert.ok(!saved.isError);
+        const itemId = (saved.structuredContent as any).item.id;
         assert.equal(
           snapshot.threads.find(
             (thread) => thread.id === id && thread.hostId === hostId,
@@ -223,6 +271,13 @@ for (const packaged of [false, true]) {
           virtualConsole,
         });
         const window = dom.window;
+        window.structuredClone = structuredClone;
+        window.HTMLDialogElement.prototype.showModal = function () {
+          this.setAttribute("open", "");
+        };
+        window.HTMLDialogElement.prototype.close = function () {
+          this.removeAttribute("open");
+        };
         const paths: string[] = [];
         const observations: string[][] = [];
         window.matchMedia = ((query: string) => ({
@@ -257,6 +312,16 @@ for (const packaged of [false, true]) {
               name: "taskboard_workspace",
               arguments: {},
             });
+          else if (path === "/api/work-items/add-thread")
+            result = await client.callTool({
+              name: "taskboard_work_item_add_thread",
+              arguments: input,
+            });
+          else if (path === "/api/work-items/save")
+            result = await client.callTool({
+              name: "taskboard_work_item_save",
+              arguments: input,
+            });
           else if (path === "/api/thread-artifacts") {
             assert.ok(!input.threadIds.includes(remoteKey));
             result = await client.callTool({
@@ -287,7 +352,7 @@ for (const packaged of [false, true]) {
         ];
         await until(
           () =>
-            cards().length === 2 &&
+            cards().length === 18 &&
             cards().some((card) =>
               card.textContent?.includes("Fixture remote ordinary"),
             ),
@@ -304,7 +369,7 @@ for (const packaged of [false, true]) {
             ?.disabled,
           true,
         );
-        assert.equal(remoteCard().querySelector(".thread-work-items"), null);
+        assert.ok(remoteCard().querySelector(".thread-work-items"));
         assert.ok(
           !cards().some((card) =>
             card.textContent?.includes("Fixture remote subagent"),
@@ -319,8 +384,75 @@ for (const packaged of [false, true]) {
           assert.ok(element, selector);
           element.click();
         };
-        // Apply the actual UI's project and title filters before snapshot loss.
+        assert.equal(
+          snapshot.threads.filter((thread) => thread.lastUserMessageAt).length,
+          16,
+        );
+        // Running-only hides idle locals, then hides SSH on loss. Recovery must
+        // not depend on a visible card or sharing the top-15 local allowance.
         click(".toolbar-actions button[aria-expanded]");
+        await until(
+          () => !!window.document.querySelector('[data-key="g:state"]'),
+        );
+        click('[data-key="g:state"]');
+        for (const state of ["waiting", "idle", "error", "unknown"]) {
+          click(`[data-key="o:state:${state}"]`);
+          await new Promise((ok) => setTimeout(ok, 20));
+        }
+        await until(() => cards().length === 1);
+        respondToFollows = false;
+        sockets.at(-1)!.destroy();
+        await until(() => cards().length === 0);
+        const lostAt = observations.length;
+        await until(
+          () =>
+            observations.length > lostAt &&
+            observations.at(-1)!.includes(remoteKey),
+        );
+        assert.equal(
+          observations.at(-1)!.filter((key) => !key.startsWith("ssh:")).length,
+          15,
+        );
+        await until(() => sockets.length === 2);
+        respondToFollows = true;
+        sendSnapshot(sockets.at(-1)!, id, hostId);
+        await until(() => !!remoteCard()?.closest(".lane--green"));
+        // Attention scope hides a disconnected unread card too.
+        states.get(remoteKey).hasUnreadTurn = true;
+        sendSnapshot(sockets.at(-1)!, id, hostId);
+        [...window.document.querySelectorAll<HTMLElement>("button")]
+          .find((button) => button.textContent?.includes("Needs attention"))!
+          .click();
+        await until(() => !!remoteCard()?.closest(".lane--blue"));
+        sockets
+          .at(-1)!
+          .write(
+            frame({
+              type: "broadcast",
+              method: "client-status-changed",
+              params: { clientId: "owner-" + hostId, status: "disconnected" },
+            }),
+          );
+        await until(() => cards().length === 0);
+        const attentionLost = observations.length;
+        await until(
+          () =>
+            observations.length > attentionLost &&
+            observations.at(-1)!.includes(remoteKey),
+        );
+        sendSnapshot(sockets.at(-1)!, id, hostId);
+        await until(() => !!remoteCard()?.closest(".lane--blue"));
+        [...window.document.querySelectorAll<HTMLElement>("button")]
+          .find((button) => button.textContent?.includes("All conversations"))!
+          .click();
+        delete states.get(remoteKey).hasUnreadTurn;
+        sendSnapshot(sockets.at(-1)!, id, hostId);
+        for (const state of ["waiting", "idle", "error", "unknown"]) {
+          click(`[data-key="o:state:${state}"]`);
+          await new Promise((ok) => setTimeout(ok, 20));
+        }
+        await until(() => cards().length === 18);
+        // Apply the actual UI's project and title filters before snapshot loss.
         await until(
           () => !!window.document.querySelector('[data-key="g:project"]'),
         );
@@ -352,9 +484,9 @@ for (const packaged of [false, true]) {
         setSearch("Fixture remote ordinary");
         await until(() => cards().length === 1);
         states.get(remoteKey).threadRuntimeStatus = { type: "idle" };
-        sendSnapshot(sockets[0], id, hostId);
+        sendSnapshot(sockets.at(-1)!, id, hostId);
         await until(() => !!remoteCard().closest(".lane--gray"));
-        sockets[0].write(
+        sockets.at(-1)!.write(
           frame({
             type: "broadcast",
             method: "client-status-changed",
@@ -387,7 +519,7 @@ for (const packaged of [false, true]) {
         respondToFollows = false;
         sockets.at(-1)!.destroy();
         await until(() => !!remoteCard()?.closest(".lane--muted"));
-        await until(() => sockets.length === 2);
+        await until(() => sockets.length === 3);
         const reconnected = observations.length;
         await until(
           () =>
@@ -402,6 +534,98 @@ for (const packaged of [false, true]) {
           remoteCard().querySelector<HTMLButtonElement>(".thread-card-open")
             ?.disabled,
           true,
+        );
+        // Only structured question titles/failures become display summaries.
+        states.get(remoteKey).turns = [
+          {
+            id: "fixture-turn",
+            status: "completed",
+            items: [
+              {
+                id: "fixture-question",
+                type: "agentMessage",
+                text: "PRIVATE_ASSISTANT",
+                questions: [{ title: "Fixture read-only question?" }],
+              },
+            ],
+          },
+        ];
+        sendSnapshot(sockets.at(-1)!, id, hostId);
+        await until(() => !!remoteCard()?.closest(".lane--amber"));
+        assert.ok(
+          remoteCard().textContent?.includes("Fixture read-only question?"),
+        );
+        assert.equal(remoteCard().querySelector(".card-confirmation"), null);
+        assert.ok(!remoteCard().textContent?.includes("PRIVATE_ASSISTANT"));
+        states.get(remoteKey).turns[0].status = "failed";
+        sendSnapshot(sockets.at(-1)!, id, hostId);
+        await until(() => !!remoteCard()?.closest(".lane--red"));
+        delete states.get(remoteKey).turns;
+        sendSnapshot(sockets.at(-1)!, id, hostId);
+        await until(() => !!remoteCard()?.closest(".lane--green"));
+        // Real picker -> MCP -> plugin SQLite, scoped away from same-ID local.
+        remoteCard()
+          .querySelector<HTMLButtonElement>(".thread-work-item-add")!
+          .click();
+        await until(
+          () => !!window.document.querySelector(".thread-work-item-option"),
+        );
+        const option = window.document.querySelector<HTMLButtonElement>(
+          ".thread-work-item-option",
+        )!;
+        assert.equal(
+          option.disabled,
+          false,
+          "Local association does not imply SSH association",
+        );
+        option.click();
+        await until(
+          () => !!remoteCard()?.querySelector(".thread-work-item-tag"),
+        );
+        const workspace = await client.callTool({
+          name: "taskboard_workspace",
+          arguments: {},
+        });
+        const data = workspace.structuredContent as any;
+        assert.deepEqual(
+          data.items.find((item: any) => item.id === itemId).threadIds,
+          [id, remoteKey],
+        );
+        assert.deepEqual(
+          data.linkedThreads.map(sessionKey).sort(),
+          [id, remoteKey].sort(),
+        );
+        assert.ok(!data.discovery.pendingThreadIds.includes(remoteKey));
+        click("#workspace-tab-items");
+        await until(
+          () => !!window.document.querySelector(".work-thread-links"),
+        );
+        const links = [
+          ...window.document.querySelectorAll<HTMLButtonElement>(
+            ".work-thread-links button",
+          ),
+        ];
+        assert.equal(links.length, 2);
+        assert.equal(links[0].disabled, false);
+        assert.equal(links[1].disabled, true);
+        assert.ok(links[1].textContent?.includes("Fixture remote ordinary"));
+        window.document.querySelector<HTMLElement>(".work-card")!.click();
+        await until(() => !!window.document.querySelector(".thread-picker"));
+        const options = [
+          ...window.document.querySelectorAll<HTMLLabelElement>(
+            ".thread-picker .thread-option",
+          ),
+        ];
+        assert.equal(
+          options.filter(
+            (label) => label.querySelector<HTMLInputElement>("input")?.checked,
+          ).length,
+          2,
+        );
+        assert.ok(
+          options.some((label) =>
+            label.textContent?.includes("Fixture remote ordinary"),
+          ),
         );
         assert.ok(paths.length > 0);
         assert.deepEqual(errors, []);

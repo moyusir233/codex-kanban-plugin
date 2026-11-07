@@ -5,6 +5,7 @@ import { basename, join } from "node:path";
 import type { Thread, ThreadLink } from "../shared/types.js";
 import type { WorkItemThread } from "../shared/work-items.js";
 import { TurnUsageReader } from "./turn-usage.js";
+import { localThreadIds } from "../shared/session-identity.js";
 
 const turnUsageReader = new TurnUsageReader();
 // 普通启动没有 WebSocket 地址，按客户端算法计算它的未读记录标识。
@@ -107,6 +108,7 @@ export function readLinkedThreads(
   home: string,
   threadIds: string[],
 ): WorkItemThread[] {
+  threadIds = localThreadIds(threadIds);
   if (!threadIds.length) return [];
   let database: DatabaseSync | undefined;
   try {

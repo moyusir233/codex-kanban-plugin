@@ -138,3 +138,26 @@ test("linked conversations exclude child agents from each supported source marke
     await rm(home, { recursive: true });
   }
 });
+
+test("local linked metadata ignores SSH keys even if a native index contains a colliding encoded ID", async () => {
+  const { sessionKey } = await import("../shared/session-identity");
+  const home = await mkdtemp(join(tmpdir(), "taskboard-local-only-linked-"));
+  const database = new DatabaseSync(join(home, "state_5.sqlite"));
+  try {
+    database.exec(
+      "CREATE TABLE threads(id TEXT, title TEXT, cwd TEXT, source TEXT, thread_source TEXT)",
+    );
+    const id = "00000000-0000-4000-8000-000000000001";
+    const remote = sessionKey({ id, hostId: "fixture-host" });
+    const insert = database.prepare(
+      "INSERT INTO threads VALUES(?, ?, '/local', 'vscode', 'user')",
+    );
+    insert.run(id, "Local title");
+    insert.run(remote, "Never resolve remote identity locally");
+    const rows = readLinkedThreads(home, [id, remote, "ssh:malformed"]);
+    assert.deepEqual(rows, [{ id, title: "Local title", project: "local" }]);
+  } finally {
+    database.close();
+    await rm(home, { recursive: true, force: true });
+  }
+});

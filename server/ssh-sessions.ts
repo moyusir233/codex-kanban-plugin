@@ -2,6 +2,11 @@ import { z } from "zod";
 import { sessionKey, type SessionTarget } from "../shared/session-identity.js";
 import type { Thread } from "../shared/types.js";
 import type { DesktopConversation } from "./desktop-ipc.js";
+import {
+  desktopInputState,
+  desktopTurns,
+  unansweredInput,
+} from "./user-input.js";
 
 const targets = z
   .array(
@@ -61,6 +66,29 @@ export function sshSessionThread(
     typeof state?.updatedAt === "number" && Number.isFinite(state.updatedAt)
       ? new Date(state.updatedAt)
       : null;
+  // Reuse the known Desktop history shape, without fetching history or exposing
+  // approval/reply controls. Missing/malformed history cannot prove an answer.
+  let question: string | null = null;
+  let pending = false;
+  let failed = false;
+  if (state) {
+    try {
+      const input = unansweredInput(desktopInputState(state));
+      pending = !!input;
+      question = input?.summary ?? null;
+      failed = desktopTurns(state).at(-1)?.status === "failed";
+    } catch {
+      // Preserve unknown display rather than guess from free-form text.
+    }
+  }
+  const waiting =
+    runtime &&
+    ["active", "idle"].includes(runtime.type) &&
+    (pending ||
+      runtime.activeFlags?.some(
+        (flag: string) =>
+          flag === "waitingOnApproval" || flag === "waitingOnUserInput",
+      ));
   return {
     id: target.threadId,
     hostId: target.hostId,
@@ -99,9 +127,15 @@ export function sshSessionThread(
     runtime,
     runtimeAt: conversation ? new Date().toISOString() : null,
     fresh: !!conversation,
-    error: null,
-    pendingUserInput: false,
+    error:
+      failed && conversation
+        ? {
+            message: "本轮执行失败，请在原对话查看详情。",
+            at: new Date().toISOString(),
+          }
+        : null,
+    pendingUserInput: pending,
     waitingSince: null,
-    waitingQuestion: null,
+    waitingQuestion: waiting && !failed ? question : null,
   };
 }

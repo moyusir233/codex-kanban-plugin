@@ -51467,6 +51467,31 @@ var TurnUsageReader = class {
   }
 };
 
+// shared/session-identity.ts
+function isLocalSession(session) {
+  return session.hostId === void 0 || session.hostId === "local";
+}
+function sessionKey(session) {
+  return isLocalSession(session) ? session.id : `ssh:${JSON.stringify([session.hostId, session.id])}`;
+}
+function remoteSessionTarget(key) {
+  if (!key.startsWith("ssh:")) return null;
+  try {
+    const pair = JSON.parse(key.slice(4));
+    if (!Array.isArray(pair) || pair.length !== 2 || typeof pair[0] !== "string" || !pair[0].length || pair[0].length > 200 || pair[0] === "local" || typeof pair[1] !== "string" || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
+      pair[1]
+    ))
+      return null;
+    const target = { hostId: pair[0], threadId: pair[1] };
+    return sessionKey({ hostId: target.hostId, id: target.threadId }) === key ? target : null;
+  } catch {
+    return null;
+  }
+}
+function localThreadIds(keys) {
+  return keys.filter((key) => !key.startsWith("ssh:"));
+}
+
 // server/local-data.ts
 var turnUsageReader = new TurnUsageReader();
 var normalLocalHost = `local:${createHash("sha256").update(JSON.stringify(["local", "local", null])).digest("hex")}`;
@@ -51514,6 +51539,7 @@ function displayTitle(name, fallback) {
   return [...value].length > 120 ? [...value].slice(0, 120).join("") + "\u2026" : value || "\u672A\u547D\u540D\u5BF9\u8BDD";
 }
 function readLinkedThreads(home, threadIds) {
+  threadIds = localThreadIds(threadIds);
   if (!threadIds.length) return [];
   let database;
   try {
@@ -51782,16 +51808,6 @@ var GitMetadataReader = class {
 import { randomUUID } from "node:crypto";
 import { createConnection } from "node:net";
 import { join as join3 } from "node:path";
-
-// shared/session-identity.ts
-function isLocalSession(session) {
-  return session.hostId === void 0 || session.hostId === "local";
-}
-function sessionKey(session) {
-  return isLocalSession(session) ? session.id : `ssh:${JSON.stringify([session.hostId, session.id])}`;
-}
-
-// server/desktop-ipc.ts
 var ownerMethods = /* @__PURE__ */ new Set([
   "thread-follower-command-approval-decision",
   "thread-follower-file-approval-decision",
@@ -52579,6 +52595,21 @@ function sshSessionThread(target, conversation) {
   } : null;
   const cwd = typeof state?.cwd === "string" ? state.cwd : "";
   const timestamp2 = typeof state?.updatedAt === "number" && Number.isFinite(state.updatedAt) ? new Date(state.updatedAt) : null;
+  let question = null;
+  let pending = false;
+  let failed = false;
+  if (state) {
+    try {
+      const input2 = unansweredInput(desktopInputState(state));
+      pending = !!input2;
+      question = input2?.summary ?? null;
+      failed = desktopTurns(state).at(-1)?.status === "failed";
+    } catch {
+    }
+  }
+  const waiting = runtime && ["active", "idle"].includes(runtime.type) && (pending || runtime.activeFlags?.some(
+    (flag) => flag === "waitingOnApproval" || flag === "waitingOnUserInput"
+  ));
   return {
     id: target.threadId,
     hostId: target.hostId,
@@ -52606,10 +52637,13 @@ function sshSessionThread(target, conversation) {
     runtime,
     runtimeAt: conversation ? (/* @__PURE__ */ new Date()).toISOString() : null,
     fresh: !!conversation,
-    error: null,
-    pendingUserInput: false,
+    error: failed && conversation ? {
+      message: "\u672C\u8F6E\u6267\u884C\u5931\u8D25\uFF0C\u8BF7\u5728\u539F\u5BF9\u8BDD\u67E5\u770B\u8BE6\u60C5\u3002",
+      at: (/* @__PURE__ */ new Date()).toISOString()
+    } : null,
+    pendingUserInput: pending,
     waitingSince: null,
-    waitingQuestion: null
+    waitingQuestion: waiting && !failed ? question : null
   };
 }
 
@@ -52735,6 +52769,20 @@ var StatusBridge = class {
       this.observationLease = setTimeout(() => this.desktop?.watch([]), 15e3);
       this.observationLease.unref();
     }
+  }
+  /** Display summaries only for registered SSH references; no subscribe/resume. */
+  linkedSshThreads(keys) {
+    const selected = new Set(keys);
+    return this.sshTargets.filter(
+      (target) => selected.has(
+        sessionKey({ id: target.threadId, hostId: target.hostId })
+      )
+    ).map(
+      (target) => sshSessionThread(
+        target,
+        this.connection.state === "connected" ? this.desktop?.get(target.threadId, target.hostId) : void 0
+      )
+    ).filter((thread) => thread.kind === "user");
   }
   /** 从原窗口快照恢复状态与提问，历史索引继续由本地读取提供。 */
   rememberDesktop(id, value) {
@@ -53308,6 +53356,13 @@ function resolveWorkItemIconColor(item) {
 }
 
 // server/work-items.ts
+var associationKey = external_exports.union([
+  external_exports.string().uuid(),
+  external_exports.string().max(1500).refine((key) => {
+    const target = remoteSessionTarget(key);
+    return !!target && external_exports.uuid().safeParse(target.threadId).success;
+  }, "Invalid host-scoped session reference")
+]);
 var workItemInput = external_exports.object({
   id: external_exports.string().uuid().optional(),
   title: external_exports.string().trim().min(1).max(200),
@@ -53315,7 +53370,7 @@ var workItemInput = external_exports.object({
   iconColor: external_exports.enum(workItemIconColors).optional(),
   description: external_exports.string().max(1e4),
   status: external_exports.enum(["planned", "active", "review", "done"]),
-  threadIds: external_exports.array(external_exports.string().uuid()).max(500),
+  threadIds: external_exports.array(associationKey).max(500),
   checklist: external_exports.array(
     external_exports.object({
       id: external_exports.string().min(1).max(100),
@@ -53334,7 +53389,7 @@ var workItemInput = external_exports.object({
 });
 var workItemThreadInput = external_exports.object({
   id: external_exports.string().uuid(),
-  threadId: external_exports.string().uuid()
+  threadId: associationKey
 });
 var WorkspaceStore = class {
   path;
@@ -54503,7 +54558,7 @@ var ThreadArtifactIndex = class {
   async read(threadIds) {
     await this.readRules();
     const rulesKey = this.rulesKey;
-    const ids = [...new Set(threadIds)];
+    const ids = [...new Set(localThreadIds(threadIds))];
     const rows = await Promise.all(ids.map((id) => this.load(id, rulesKey)));
     if (rulesKey !== this.rulesKey) return this.read(threadIds);
     const discovery = {
@@ -54619,14 +54674,23 @@ var icon = "data:image/svg+xml," + encodeURIComponent(
 var bridge = new StatusBridge();
 var workspace = new WorkspaceStore(bridge.home);
 var artifacts = new ThreadArtifactIndex(bridge.home);
-var discover = async (data) => ({
-  ...data,
-  linkedThreads: readLinkedThreads(
-    bridge.home,
-    data.items.flatMap((item) => item.threadIds)
-  ),
-  discovery: await artifacts.read(data.items.flatMap((item) => item.threadIds))
-});
+var discover = async (data) => {
+  const keys = data.items.flatMap((item) => item.threadIds);
+  const local = localThreadIds(keys);
+  return {
+    ...data,
+    linkedThreads: [
+      ...readLinkedThreads(bridge.home, local),
+      ...bridge.linkedSshThreads(keys).map(({ id, hostId, title, project }) => ({
+        id,
+        hostId,
+        title,
+        project
+      }))
+    ],
+    discovery: await artifacts.read(local)
+  };
+};
 bridge.start();
 var handle = serveStdio(
   () => {

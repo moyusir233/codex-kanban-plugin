@@ -20,6 +20,17 @@ Base: `51a96afdbdd8d427c02bb03c4a0cabacc6ac0e25`.
 - IPC `client-discovery-request` is routing/capability discovery, not a session
   listing. The observer still answers `canHandle: false`. No guessed listing
   methods are sent. Automatic discovery remains unsupported, not simulated.
+- Rechecked the official app-server and remote-connection documentation for
+  this extension. `thread/read` does not resume/load a thread, but that fact
+  does not establish a route through Desktop's existing SSH connection. The
+  repository's observer exposes only following/snapshot messages; its owner
+  requests are local-only. No Desktop application bundle was available in
+  this Linux checkout for further static verification.
+- The existing local card opens `codex://threads/<id>` through the MCP host's
+  `openLink`. Neither available code nor the checked documentation establishes
+  a host-aware equivalent or its loaded/read effects. SSH card and collection
+  navigation therefore remain disabled with an explanation. No guessed links,
+  remote owner requests, or live navigation experiments were attempted.
 
 ## Explicit opt-in
 
@@ -54,6 +65,48 @@ and kind as non-live filter metadata for the same registered host/thread pair.
 Runtime, freshness, unread and pending-confirmation state are invalidated.
 This keeps project/title-filtered observation candidates eligible for recovery;
 a new live snapshot replaces the cached metadata.
+Observation candidates retain the local top-15 policy plus up to 50 registered
+SSH candidates matching project/title/collection search, independent of runtime,
+read and attention filters. Newer local threads cannot evict a disconnected SSH
+candidate. Hidden pages and non-board views still release observation; this is
+not an always-on background watcher or a guarantee that Desktop sends a snapshot.
+
+## Safe display and plugin-owned collections
+
+When the already-received snapshot includes the known Desktop turn-history
+shape, the mapper reuses the local structured-question parser for a short
+unanswered-question title and the latest failed-turn marker. It does not fetch
+history, expose approval payloads, or create answer/approval controls. Missing
+or malformed history is not proof that there are no questions. No waiting-start
+timestamp, user-message timestamp, usage or free-form assistant text is invented.
+Question/error display is cleared on snapshot loss.
+
+SSH cards can join/create/edit the plugin's existing collections. Associations
+use canonical `ssh:["hostId","threadId"]` keys in the existing `threadIds` array;
+local UUIDs and pre-existing records are unchanged. The picker, card tags, search,
+runtime counts and linked metadata use the same host-scoped keys. Collection
+status/checklists remain manual, not inferred session completion. Saving them
+writes only the plugin-owned `kanban/workspace.sqlite`, never the Codex session.
+
+Only explicitly configured remote references receive snapshot summaries; storing
+a reference does not register, subscribe to or resume that thread. Unavailable
+references remain removable. Local metadata/artifact readers exclude even
+malformed `ssh:` keys before any local lookup or worker scheduling. SSH cwd is
+display-only; remote history, Git, automatic artifacts and review remain disabled.
+Remote collection links cannot navigate. No database migration is required; older
+upstream clients do not understand SSH association keys, so editing mixed-host
+collections should use this fork rather than an older installed package.
+
+| Capability | Local behavior (unchanged) | SSH in this fork |
+| --- | --- | --- |
+| Candidates/metadata | Local index and existing Desktop/shared-backend routes | Explicit host/thread registration, Desktop v11 snapshot only |
+| Runtime/unread/model/mode/goal | Existing local sources | Observed supported fields only; loss means unknown |
+| Question/failure display | Existing Desktop/history parsing | Known shape from received snapshot only; read-only |
+| Collections | Existing plugin-owned records | Host-scoped association, picker, tags and search |
+| Open session | Existing local deep link | Disabled: route and read/load effects unverified |
+| Discovery | Existing local index/listing | No verified read-only Desktop SSH listing route |
+| Approvals/answers/execution | Existing local controls | Disabled, including after reconnect |
+| Usage/input timing/Git/artifacts/review/monitoring | Existing local behavior | Unavailable; no remote filesystem interpretation |
 
 ## Source, repository distribution, and installed plugin
 
@@ -77,12 +130,12 @@ a new live snapshot replaces the cached metadata.
 
 - Remote approval, reply, execution, resume, ownership acquisition, and
   unverified deep-link navigation are disabled, not offered behind a toggle.
-- Remote cards are excluded from local Git reads, artifacts, monitoring links,
-  and work-item associations. Approval payloads are not board confirmations.
+- Remote cards are excluded from local Git reads, artifacts and monitoring links.
+  Approval payloads are not board confirmations.
   Existing local operations stay unchanged.
-- No remote history, last-user-message time, usage, Git, artifacts, pending
-  question parsing, or cross-host work items. Native waiting flags only;
-  missing flags do not prove the absence of questions.
+- No remote history fetching, last-user-message time, usage, Git or artifacts.
+  Native waiting flags and recognized snapshot questions only; missing data
+  does not prove the absence of questions.
 - Host IDs are caller-provided, not independently verified as SSH hosts.
 - Desktop IPC v11 is an observed private protocol, not a stable public API.
   Snapshot availability depends on the desktop owner. Automatic discovery
@@ -91,6 +144,23 @@ a new live snapshot replaces the cached metadata.
   fixtures, including the real built UI in a synthetic DOM connected to MCP
   subprocesses launched from source/distribution configs. Nested/non-scalar
   patch path regressions reject property-key coercion before patch application.
+  Recovery fixtures include 16 newer local threads under running-only and
+  attention filters, project/title filters, owner loss and transport reconnect.
+  Collection fixtures exercise real UI/MCP writes to temporary plugin data,
+  identical local/remote IDs and multiple-host persistence isolation.
   No new live observation or session mutation was performed.
 - No session storage reads, security changes, host/plugin installation,
   website deployment, publication, merge, or upstream PR is needed.
+
+## Smallest next Desktop acceptance step
+
+First verify the tested source/repository build ID, not just the plugin version.
+The existing Mac installation and its plugin-specific Node 24 configuration are
+untouched and still run their installed bytes. Any separate installation/update
+or live disconnect/navigation test needs its own user-controlled acceptance.
+Using only the named test session, start with a visible, read-only board check of
+title/model/unread and disabled action/navigation controls. Do not send a message
+or resume a thread to obtain metadata. Then, if separately authorized, verify a
+disconnect/reconnect with 15+ local candidates and running/attention filters;
+state must become unknown and recover only on a replacement snapshot. Fixture
+success does not prove reliability of the current Desktop private protocol.

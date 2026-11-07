@@ -12,6 +12,7 @@ export type WorkItem = {
   iconColor?: WorkItemIconColor;
   description: string;
   status: WorkItemStatus;
+  /** Legacy local UUIDs or canonical sessionKey(hostId, threadId) for SSH. */
   threadIds: string[];
   checklist: { id: string; text: string; done: boolean }[];
   links: { label: string; url: string }[];
@@ -46,7 +47,10 @@ export type ArtifactDiscovery = {
 };
 
 /** 事项关联列表只需要基本信息，运行状态仍由看板快照提供。 */
-export type WorkItemThread = Pick<Thread, "id" | "title" | "project">;
+export type WorkItemThread = Pick<
+  Thread,
+  "id" | "hostId" | "title" | "project"
+>;
 
 export type WorkspaceData = {
   items: WorkItem[];

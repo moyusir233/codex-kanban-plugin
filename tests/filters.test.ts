@@ -312,3 +312,71 @@ test("filter badge counts only choices that change the default browsing scope", 
     4,
   );
 });
+
+test("SSH observation candidates survive local top-15 pressure and stale runtime/read filters", async () => {
+  const { observationCandidates } = await import("../ui/board-filters");
+  const { sessionKey } = await import("../shared/session-identity");
+  const { cachedSnapshot, reconcileSnapshot } =
+    await import("../ui/snapshot-cache");
+  const locals = Array.from({ length: 20 }, (_, i) => ({
+    ...base,
+    id: `local-${String(i).padStart(2, "0")}`,
+    lastUserMessageAt: "2026-11-07T00:00:00Z",
+  }));
+  const remote = {
+    ...base,
+    id: locals[0].id,
+    hostId: "ssh-one",
+    title: "Remote recovery",
+    project: "Remote project",
+    unread: true,
+  };
+  const other = { ...remote, hostId: "ssh-two" };
+  const agent = { ...remote, id: "agent", kind: "agent" as const };
+  const live = [...locals, remote, other, agent];
+  for (const filters of [
+    { state: ["running"] },
+    { state: ["running"], read: ["unread"] },
+  ] as FilterValue[]) {
+    const keys = observationCandidates(live, filters, "");
+    assert.deepEqual(keys.slice(0, 15), locals.slice(0, 15).map(sessionKey));
+    assert.deepEqual(keys.slice(15), [sessionKey(remote), sessionKey(other)]);
+    const snapshot = {
+      schemaVersion: 1,
+      threads: live,
+      sources: { metadata: true },
+    } as any;
+    const lost = cachedSnapshot(snapshot);
+    assert.equal(
+      lost.threads.find((t: Thread) => t.hostId === remote.hostId)!.fresh,
+      false,
+    );
+    assert.equal(
+      matchesFilters(
+        lost.threads.find((t: Thread) => t.hostId === remote.hostId)!,
+        filters,
+      ),
+      false,
+    );
+    assert.deepEqual(observationCandidates(lost.threads, filters, ""), keys);
+    const recovered = reconcileSnapshot(lost, snapshot);
+    assert.deepEqual(
+      observationCandidates(recovered.threads, filters, ""),
+      keys,
+    );
+  }
+  assert.deepEqual(
+    observationCandidates(live, { project: [remote.project] }, remote.title),
+    [sessionKey(remote), sessionKey(other)],
+  );
+  assert.deepEqual(observationCandidates(live, {}, "missing"), []);
+  assert.deepEqual(
+    observationCandidates(locals, {}, ""),
+    locals.slice(0, 15).map(sessionKey),
+  );
+  const items = new Map([[sessionKey(remote), ["Host-owned collection"]]]);
+  assert.deepEqual(
+    observationCandidates(live, {}, "Host-owned collection", items),
+    [sessionKey(remote)],
+  );
+});

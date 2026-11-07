@@ -1,4 +1,5 @@
 import { createHash } from "node:crypto";
+import { localThreadIds } from "../shared/session-identity.js";
 import { mkdir, readFile, stat, writeFile } from "node:fs/promises";
 import { isAbsolute, join } from "node:path";
 import type {
@@ -124,7 +125,7 @@ export class ThreadArtifactIndex {
   async read(threadIds: string[]): Promise<ArtifactDiscovery> {
     await this.readRules();
     const rulesKey = this.rulesKey;
-    const ids = [...new Set(threadIds)];
+    const ids = [...new Set(localThreadIds(threadIds))];
     const rows = await Promise.all(ids.map((id) => this.load(id, rulesKey)));
     if (rulesKey !== this.rulesKey) return this.read(threadIds);
     const discovery: ArtifactDiscovery = {

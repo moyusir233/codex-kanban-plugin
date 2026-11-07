@@ -269,3 +269,45 @@ test("adding a thread respects the existing limit without rejecting an existing 
     await rm(home, { recursive: true, force: true });
   }
 });
+
+test("plugin-owned collections persist distinct local and cross-host references without changing native data", async () => {
+  const { sessionKey, remoteSessionTarget, localThreadIds } =
+    await import("../shared/session-identity");
+  const home = await mkdtemp(join(tmpdir(), "taskboard-host-collections-"));
+  try {
+    const nativePath = join(home, "state_5.sqlite");
+    await writeFile(nativePath, "native-unchanged");
+    const store = new WorkspaceStore(home);
+    const remote = sessionKey({ id: threadId, hostId: "fixture-ssh" });
+    const other = sessionKey({ id: threadId, hostId: "other-ssh" });
+    const legacy = store.save(input).item;
+    const created = store.addThread(legacy.id, remote).item;
+    const mixed = store.addThread(created.id, other).item;
+    assert.deepEqual(mixed.threadIds, [threadId, remote, other]);
+    assert.deepEqual(store.addThread(mixed.id, remote).item, mixed);
+    const saved = store.save({ ...mixed, title: "Changed plugin title" }).item;
+    assert.deepEqual(new WorkspaceStore(home).read().items[0], saved);
+    assert.equal(saved.createdAt, legacy.createdAt);
+    assert.deepEqual(localThreadIds(saved.threadIds), [threadId]);
+    assert.deepEqual(remoteSessionTarget(remote), {
+      threadId,
+      hostId: "fixture-ssh",
+    });
+    for (const key of [
+      'ssh:["local","' + threadId + '"]',
+      'ssh:["fixture-ssh","/remote/path"]',
+      'ssh:["fixture-ssh","' + threadId + '","extra"]',
+      'ssh: ["fixture-ssh","' + threadId + '"]',
+      'ssh:[["fixture-ssh"],"' + threadId + '"]',
+      "/remote/path",
+      "ssh:invalid",
+    ]) {
+      assert.throws(() => store.addThread(saved.id, key));
+      assert.throws(() => store.save({ ...saved, threadIds: [key] }));
+    }
+    assert.deepEqual(store.read().items[0], saved);
+    assert.equal(await readFile(nativePath, "utf8"), "native-unchanged");
+  } finally {
+    await rm(home, { recursive: true, force: true });
+  }
+});

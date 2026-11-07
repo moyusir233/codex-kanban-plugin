@@ -1,3 +1,4 @@
+import { isLocalSession, sessionKey } from "../shared/session-identity";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   CheckCheck,
@@ -162,14 +163,17 @@ export function WorkItems({
   const [filterOpen, setFilterOpen] = useState(false);
   const [revision, setRevision] = useState(0);
   const byId = useMemo(
-    () => new Map(threads.map((thread) => [thread.id, thread])),
+    () => new Map(threads.map((thread) => [sessionKey(thread), thread])),
     [threads],
   );
   const availableById = useMemo(
     // 关联摘要补齐旧对话和归档对话，当前快照的标题优先。
     () =>
       new Map(
-        [...linkedThreads, ...threads].map((thread) => [thread.id, thread]),
+        [...linkedThreads, ...threads].map((thread) => [
+          sessionKey(thread),
+          thread,
+        ]),
       ),
     [linkedThreads, threads],
   );
@@ -567,6 +571,12 @@ export function WorkItems({
                         return (
                           <button
                             key={id}
+                            disabled={id.startsWith("ssh:")}
+                            title={
+                              id.startsWith("ssh:")
+                                ? "SSH navigation is unverified; open in Codex Desktop."
+                                : undefined
+                            }
                             onClick={() =>
                               void openConversation(id).catch((reason) =>
                                 setError(
@@ -606,7 +616,7 @@ export function WorkItems({
                   <DetectedArtifacts
                     artifacts={itemArtifacts(discovery, item)}
                     links={item.links}
-                    threads={availableThreads}
+                    threads={availableThreads.filter(isLocalSession)}
                     onError={setError}
                   />
                   <div className="work-card-footer">
@@ -720,7 +730,7 @@ function ItemEditor({
   const { t } = useI18n();
   const [threadQuery, setThreadQuery] = useState("");
   const [checkText, setCheckText] = useState("");
-  const byId = new Map(threads.map((thread) => [thread.id, thread]));
+  const byId = new Map(threads.map((thread) => [sessionKey(thread), thread]));
   const selected = new Set(draft.threadIds);
   const options = threads
     .filter((thread) =>
@@ -729,7 +739,11 @@ function ItemEditor({
         .includes(threadQuery.trim().toLocaleLowerCase()),
     )
     // 已绑定的对话排在前面，避免自动补齐后落到选择列表的截断范围外。
-    .sort((a, b) => Number(selected.has(b.id)) - Number(selected.has(a.id)));
+    .sort(
+      (a, b) =>
+        Number(selected.has(sessionKey(b))) -
+        Number(selected.has(sessionKey(a))),
+    );
   const optionLimit = Math.max(100, selected.size);
   const missing = draft.threadIds.filter((id) => !byId.has(id));
   const update = (patch: Partial<WorkItemInput>) =>
@@ -845,16 +859,16 @@ function ItemEditor({
                 </label>
               ))}
               {options.slice(0, optionLimit).map((thread) => (
-                <label className="thread-option" key={thread.id}>
+                <label className="thread-option" key={sessionKey(thread)}>
                   <input
                     type="checkbox"
-                    checked={selected.has(thread.id)}
+                    checked={selected.has(sessionKey(thread))}
                     onChange={(event) =>
                       update({
                         threadIds: event.target.checked
-                          ? [...draft.threadIds, thread.id]
+                          ? [...draft.threadIds, sessionKey(thread)]
                           : draft.threadIds.filter(
-                              (value) => value !== thread.id,
+                              (value) => value !== sessionKey(thread),
                             ),
                       })
                     }
@@ -954,7 +968,7 @@ function ItemEditor({
             </p>
             <DetectedArtifacts
               artifacts={artifacts}
-              threads={threads}
+              threads={threads.filter(isLocalSession)}
               onError={onArtifactError}
             />
             {!artifactsLoading && !artifacts.length && (

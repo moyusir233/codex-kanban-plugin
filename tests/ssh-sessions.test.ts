@@ -113,3 +113,66 @@ test("remote collaboration modes accept local-compatible string and object shape
     );
   }
 });
+
+test("SSH display reuses known structured Desktop questions and turn failures, never actions or invented usage", () => {
+  const conversation = (state: any) => ({
+    revision: 1,
+    ownerClientId: "fixture",
+    state,
+  });
+  const question = {
+    id: "q",
+    type: "agentMessage",
+    questions: [{ title: "Read-only question?" }],
+    text: "PRIVATE_ASSISTANT_BODY",
+  };
+  const turn = { id: "t", status: "completed", items: [question] };
+  const state = {
+    threadRuntimeStatus: { type: "idle" },
+    turns: [turn],
+    requests: [{ id: "approval", command: "PRIVATE_COMMAND" }],
+  };
+  const waiting = sshSessionThread(target, conversation(state));
+  assert.equal(columnFor(waiting), "waiting");
+  assert.equal(waiting.waitingQuestion, "Read-only question?");
+  assert.equal(waiting.waitingSince, null);
+  assert.equal(waiting.turnUsage, null);
+  assert.equal(waiting.lastUserMessageAt, null);
+  assert.equal(JSON.stringify(waiting).includes("PRIVATE"), false);
+  const answered = sshSessionThread(
+    target,
+    conversation({
+      ...state,
+      turns: [
+        turn,
+        {
+          id: "reply",
+          status: "inProgress",
+          items: [
+            { type: "userMessage", content: [{ text: "Fixture reply" }] },
+          ],
+        },
+      ],
+    }),
+  );
+  assert.equal(answered.pendingUserInput, false);
+  assert.equal(answered.waitingQuestion, null);
+  const failed = sshSessionThread(
+    target,
+    conversation({ ...state, turns: [{ ...turn, status: "failed" }] }),
+  );
+  assert.equal(columnFor(failed), "error");
+  assert.equal(failed.pendingUserInput, false);
+  assert.equal(failed.waitingQuestion, null);
+  assert.ok(failed.error);
+  const malformed = sshSessionThread(
+    target,
+    conversation({ ...state, turns: [{ ...turn, items: {} }] }),
+  );
+  assert.equal(malformed.waitingQuestion, null);
+  const lost = sshSessionThread(target);
+  assert.equal(lost.pendingUserInput, false);
+  assert.equal(lost.waitingQuestion, null);
+  assert.equal(lost.error, null);
+  assert.equal(lost.runtime, null);
+});

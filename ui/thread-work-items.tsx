@@ -14,8 +14,10 @@ import { WorkItemIcon, WorkItemIconPicker } from "./work-item-icon";
 import { Button } from "./vendor/affectui/button";
 import "./thread-work-items.css";
 
+import { sessionKey } from "../shared/session-identity";
+
 type Props = {
-  thread: Pick<Thread, "id" | "title">;
+  thread: Pick<Thread, "id" | "hostId" | "title">;
   items: WorkItem[];
   onAdd: () => void;
   onOpenItem: (id: string) => void;
@@ -24,7 +26,9 @@ type Props = {
 /** 从对话卡片直接关联合集，并用标签返回该合集。 */
 export function ThreadWorkItems({ thread, items, onAdd, onOpenItem }: Props) {
   const { t } = useI18n();
-  const linked = items.filter((item) => item.threadIds.includes(thread.id));
+  const linked = items.filter((item) =>
+    item.threadIds.includes(sessionKey(thread)),
+  );
   return (
     <div
       className="thread-work-items"
@@ -109,14 +113,14 @@ export function ThreadWorkItemPicker({
     setError("");
     try {
       const data = id
-        ? await addThreadToWorkItem(id, thread.id)
+        ? await addThreadToWorkItem(id, sessionKey(thread))
         : await saveWorkItem({
             title: title.trim(),
             icon,
             iconColor,
             description: "",
             status: "planned",
-            threadIds: [thread.id],
+            threadIds: [sessionKey(thread)],
             checklist: [],
             links: [],
           });
@@ -163,7 +167,7 @@ export function ThreadWorkItemPicker({
       </label>
       <div className="thread-work-item-options">
         {displayed.map((item) => {
-          const linked = item.threadIds.includes(thread.id);
+          const linked = item.threadIds.includes(sessionKey(thread));
           return (
             <button
               type="button"

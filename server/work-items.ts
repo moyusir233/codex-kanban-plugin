@@ -3,6 +3,7 @@ import { existsSync, mkdirSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import { z } from "zod";
+import { remoteSessionTarget } from "../shared/session-identity.js";
 import {
   randomWorkItemIcon,
   resolveWorkItemIcon,
@@ -17,6 +18,17 @@ import type {
   WorkspaceData,
 } from "../shared/work-items.js";
 
+const associationKey = z.union([
+  z.string().uuid(),
+  z
+    .string()
+    .max(1500)
+    .refine((key) => {
+      const target = remoteSessionTarget(key);
+      return !!target && z.uuid().safeParse(target.threadId).success;
+    }, "Invalid host-scoped session reference"),
+]);
+
 export const workItemInput = z.object({
   id: z.string().uuid().optional(),
   title: z.string().trim().min(1).max(200),
@@ -24,7 +36,7 @@ export const workItemInput = z.object({
   iconColor: z.enum(workItemIconColors).optional(),
   description: z.string().max(10000),
   status: z.enum(["planned", "active", "review", "done"]),
-  threadIds: z.array(z.string().uuid()).max(500),
+  threadIds: z.array(associationKey).max(500),
   checklist: z
     .array(
       z.object({
@@ -52,7 +64,7 @@ export const workItemInput = z.object({
 
 export const workItemThreadInput = z.object({
   id: z.string().uuid(),
-  threadId: z.string().uuid(),
+  threadId: associationKey,
 });
 
 /** 在插件自己的 SQLite 中保存事项，支持多个看板连接同时读写。 */

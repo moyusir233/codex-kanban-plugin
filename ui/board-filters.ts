@@ -6,6 +6,30 @@ import {
   type Thread,
 } from "../shared/types";
 import type { FilterValue } from "./vendor/affectui/filter-menu";
+import { isLocalSession, sessionKey } from "../shared/session-identity";
+
+/** Keep the local top-15 policy; registered SSH targets must not compete with
+ * newer locals or disappear when stale runtime/read filters hide their cards. */
+export function observationCandidates(
+  threads: Thread[],
+  filters: FilterValue,
+  query: string,
+  itemTitles: ReadonlyMap<string, string[]> = new Map(),
+): string[] {
+  const eligible = threads.filter(
+    (thread) =>
+      thread.kind === "user" &&
+      (!filters.project?.length || filters.project.includes(thread.project)) &&
+      matchesQuery(thread, query, itemTitles.get(sessionKey(thread))),
+  );
+  return [
+    ...eligible
+      .filter(isLocalSession)
+      .sort(compareByLastUserMessage)
+      .slice(0, 15),
+    ...eligible.filter((thread) => !isLocalSession(thread)).slice(0, 50),
+  ].map(sessionKey);
+}
 
 /** 默认保留所有本地对话，断线或尚未加载时也能继续浏览。 */
 export const DEFAULT_FILTERS: FilterValue = {

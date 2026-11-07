@@ -166,6 +166,26 @@ export class StatusBridge {
     }
   }
 
+  /** Display summaries only for registered SSH references; no subscribe/resume. */
+  linkedSshThreads(keys: string[]): Thread[] {
+    const selected = new Set(keys);
+    return this.sshTargets
+      .filter((target) =>
+        selected.has(
+          sessionKey({ id: target.threadId, hostId: target.hostId }),
+        ),
+      )
+      .map((target) =>
+        sshSessionThread(
+          target,
+          this.connection.state === "connected"
+            ? this.desktop?.get(target.threadId, target.hostId)
+            : undefined,
+        ),
+      )
+      .filter((thread) => thread.kind === "user");
+  }
+
   /** 从原窗口快照恢复状态与提问，历史索引继续由本地读取提供。 */
   private rememberDesktop(id: string, value: DesktopConversation) {
     const state = value.state;

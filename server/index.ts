@@ -6,6 +6,7 @@ import { serveStdio } from "@modelcontextprotocol/server/stdio";
 import { OpenAIExtensions } from "@openai/mcp-extensions/server";
 import { z } from "zod";
 import { StatusBridge } from "./status-bridge.js";
+import { localThreadIds } from "../shared/session-identity.js";
 import { readLinkedThreads } from "./local-data.js";
 import {
   WorkspaceStore,
@@ -38,14 +39,25 @@ const bridge = new StatusBridge();
 const workspace = new WorkspaceStore(bridge.home);
 const artifacts = new ThreadArtifactIndex(bridge.home);
 /** 合集只聚合统一对话成果索引，不再自行扫描关联历史记录。 */
-const discover = async <T extends WorkspaceData>(data: T) => ({
-  ...data,
-  linkedThreads: readLinkedThreads(
-    bridge.home,
-    data.items.flatMap((item) => item.threadIds),
-  ),
-  discovery: await artifacts.read(data.items.flatMap((item) => item.threadIds)),
-});
+const discover = async <T extends WorkspaceData>(data: T) => {
+  const keys = data.items.flatMap((item) => item.threadIds);
+  const local = localThreadIds(keys);
+  return {
+    ...data,
+    linkedThreads: [
+      ...readLinkedThreads(bridge.home, local),
+      ...bridge
+        .linkedSshThreads(keys)
+        .map(({ id, hostId, title, project }) => ({
+          id,
+          hostId,
+          title,
+          project,
+        })),
+    ],
+    discovery: await artifacts.read(local),
+  };
+};
 bridge.start();
 
 const handle = serveStdio(

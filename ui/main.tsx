@@ -65,6 +65,7 @@ import {
   matchesQuery,
   compareAttention,
   activeFilterCount,
+  observationCandidates,
 } from "./board-filters";
 import {
   PREFERENCE_KEY,
@@ -387,22 +388,17 @@ function Board() {
   // 先忽略运行和已读筛选，避免初始未知状态把所有观察候选都筛掉。
   const candidates = useMemo(
     () =>
-      boardThreads
-        .filter(
-          (thread) =>
-            (!filters.project?.length ||
-              filters.project.includes(thread.project)) &&
-            matchesQuery(
-              thread,
-              query,
-              isLocalSession(thread)
-                ? itemsByThread.get(thread.id)?.map((item) => item.title)
-                : undefined,
-            ),
-        )
-        .sort(compareByLastUserMessage)
-        .slice(0, 15)
-        .map(sessionKey),
+      observationCandidates(
+        boardThreads,
+        filters,
+        query,
+        new Map(
+          [...itemsByThread].map(([key, items]) => [
+            key,
+            items.map((item) => item.title),
+          ]),
+        ),
+      ),
     [boardThreads, filters.project, query, itemsByThread],
   );
   candidatesRef.current = candidates;
@@ -414,9 +410,7 @@ function Board() {
           matchesQuery(
             thread,
             query,
-            isLocalSession(thread)
-              ? itemsByThread.get(thread.id)?.map((item) => item.title)
-              : undefined,
+            itemsByThread.get(sessionKey(thread))?.map((item) => item.title),
           ),
       ),
     [boardThreads, filters, query, itemsByThread],
@@ -928,7 +922,7 @@ function Board() {
         >
           <WorkItems
             active={view === "items"}
-            threads={boardThreads.filter(isLocalSession)}
+            threads={boardThreads}
             artifactRevision={artifactRevision}
             onChanged={updateWorkspace}
             openItem={workItems.find((item) => item.id === openItemId) ?? null}
@@ -1170,7 +1164,11 @@ function ThreadCard({
         className="thread-card-open"
         onClick={() => onOpen(thread)}
         disabled={!local}
-        title={t("打开对话：{title}", { title: thread.title })}
+        title={
+          local
+            ? t("打开对话：{title}", { title: thread.title })
+            : "SSH navigation is unverified; open in Codex Desktop. Opening may change loaded/read state."
+        }
         aria-label={t("打开对话：{title}", { title: thread.title })}
         aria-describedby={`thread-context-${key} thread-input-${key}`}
       >
@@ -1324,14 +1322,12 @@ function ThreadCard({
             )}
           </div>
         )}
-      {local && (
-        <ThreadWorkItems
-          thread={thread}
-          items={workItems}
-          onAdd={() => onAddItem(thread)}
-          onOpenItem={onOpenItem}
-        />
-      )}
+      <ThreadWorkItems
+        thread={thread}
+        items={workItems}
+        onAdd={() => onAddItem(thread)}
+        onOpenItem={onOpenItem}
+      />
     </article>
   );
 }

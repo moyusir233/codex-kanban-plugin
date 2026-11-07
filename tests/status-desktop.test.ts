@@ -526,6 +526,21 @@ test("explicit SSH targets stay unknown until observed and never enter local enr
     assert.equal((await remote()).git, null);
     assert.equal((await remote()).lastUserMessageAt, null);
     assert.equal((await remote()).goalStatus, "active");
+    const { sessionKey } = await import("../shared/session-identity");
+    const key = sessionKey({ id, hostId });
+    const beforeLinked = f.messages.length;
+    assert.equal(f.bridge.linkedSshThreads([id]).length, 0);
+    assert.equal(
+      f.bridge.linkedSshThreads([sessionKey({ id, hostId: "other-host" })])
+        .length,
+      0,
+    );
+    assert.equal(f.bridge.linkedSshThreads([key])[0].title, "Remote only");
+    assert.equal(
+      f.messages.length,
+      beforeLinked,
+      "Collection metadata cannot initiate observation or actions",
+    );
     assert.deepEqual(data.confirmations?.requests, []);
     assert.ok(!readCwds.includes("/REMOTE_PATH_MUST_NOT_BE_READ"));
     assert.ok(!JSON.stringify(data).includes("PRIVATE_REMOTE_COMMAND"));
@@ -533,6 +548,9 @@ test("explicit SSH targets stay unknown until observed and never enter local enr
     assert.equal((await remote()).fresh, false);
     assert.equal(columnFor(await remote()), "unknown");
     assert.equal((await remote()).runtime, null);
+    const staleLinked = f.bridge.linkedSshThreads([key])[0];
+    assert.equal(staleLinked.fresh, false);
+    assert.equal(staleLinked.runtime, null);
     assert.deepEqual(
       [
         ...new Set(

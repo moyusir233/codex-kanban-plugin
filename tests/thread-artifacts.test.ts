@@ -552,3 +552,29 @@ test("a running index observes rule changes saved by another index", () =>
       second.stop();
     }
   }));
+
+test("remote collection keys never enter local artifact loading or workers", () =>
+  fixture(async (home) => {
+    const { sessionKey } = await import("../shared/session-identity");
+    const index = new ThreadArtifactIndex(home);
+    const loads: string[] = [];
+    (index as any).load = async (id: string) => {
+      loads.push(id);
+      return { artifacts: [] };
+    };
+    (index as any).enqueue = (id: string) => {
+      loads.push(id);
+    };
+    try {
+      const remote = sessionKey({
+        id: "00000000-0000-4000-8000-000000000001",
+        hostId: "fixture",
+      });
+      const value = await index.read([remote, "ssh:malformed", "first"]);
+      assert.deepEqual(loads, ["first", "first"]);
+      assert.deepEqual(value.artifacts, []);
+      assert.deepEqual(value.pendingThreadIds, []);
+    } finally {
+      index.stop();
+    }
+  }));

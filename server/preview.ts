@@ -1,6 +1,7 @@
 import { createServer } from "node:http";
 import { readFile } from "node:fs/promises";
 import { StatusBridge } from "./status-bridge.js";
+import { localThreadIds } from "../shared/session-identity.js";
 import { readLinkedThreads } from "./local-data.js";
 import { WorkspaceStore } from "./work-items.js";
 import { readWorkReview } from "./work-history.js";
@@ -12,14 +13,25 @@ const bridge = new StatusBridge();
 const workspace = new WorkspaceStore(bridge.home);
 const artifacts = new ThreadArtifactIndex(bridge.home);
 /** 预览和工作事项复用同一份对话成果磁盘索引。 */
-const discover = async <T extends WorkspaceData>(data: T) => ({
-  ...data,
-  linkedThreads: readLinkedThreads(
-    bridge.home,
-    data.items.flatMap((item) => item.threadIds),
-  ),
-  discovery: await artifacts.read(data.items.flatMap((item) => item.threadIds)),
-});
+const discover = async <T extends WorkspaceData>(data: T) => {
+  const keys = data.items.flatMap((item) => item.threadIds);
+  const local = localThreadIds(keys);
+  return {
+    ...data,
+    linkedThreads: [
+      ...readLinkedThreads(bridge.home, local),
+      ...bridge
+        .linkedSshThreads(keys)
+        .map(({ id, hostId, title, project }) => ({
+          id,
+          hostId,
+          title,
+          project,
+        })),
+    ],
+    discovery: await artifacts.read(local),
+  };
+};
 const port = Number(process.env.TASKBOARD_PORT ?? 4318);
 if (!Number.isInteger(port) || port < 1024 || port > 65535)
   throw new Error("Invalid preview port");
