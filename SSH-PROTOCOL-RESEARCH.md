@@ -86,6 +86,53 @@ exists in every version. Do not send guessed RPC names, scrape restricted catalo
 files or run a second SSH backend as a substitute for Desktop's connection.
 Explicit pair registration remains required pending a supported export/transport.
 
+### Whole-build registration audit and internal RPC boundary — 2026-11-08
+
+To check the earlier bounded audit for a missed dynamic registration, scanned
+all packed JavaScript entries under `.vite/build/` and `webview/assets/` in the
+same downloaded ASAR: **9,416 entries / 531,882,474 bytes**. Reads used the
+ASAR header offsets; each matching entry was checked against its whole-file
+and block SHA256 metadata. No extracted code was executed. This scope includes
+the async renderer chunks absent from the previous extracted-file search, but
+not native executables, unpacked files or other Desktop versions.
+
+- `addRequestHandler(` matched only bootstrap339: the IPC client definition,
+  the `uc` registration helper and its explicit `thread-owner-discovery`
+  registration. The helper registers the known owner/follower methods. In
+  all 28 main-bootstrap JS files, the IPC client request-handler map is
+  populated through this method; the other `requestHandlers.set` belongs to
+  the unrelated generic JSON-RPC/browser module. No host/session catalog
+  registration was established by this audit. String scanning alone cannot
+  exclude computed/obfuscated names; the handler-map and dispatch trace is the
+  stronger evidence for this inspected client.
+- bootstrap339 `handleClientDiscoveryRequest` checks the protocol version
+  and looks up the exact method in that client map; absent handlers answer
+  `canHandle: false`. `handleRequest` uses the same admission and handler map.
+  The router selects registered clients and forwards requests; it does not
+  implicitly forward arbitrary app-server RPC. Bootstrap entry `iv`, `ib`
+  and `iy` define the known protocol versions, not an external catalog grant.
+- Renderer182735 `hms3` obtains `appServices.appServerManagers` supplied by
+  Desktop, subscribes to a host and receives a ready manager lease. Its
+  `Dgwo`/`bBSc` use that host-bound manager for the `recentThreads` subscription.
+  bootstrap854 `Ft.open` returns a manager wrapped with `assertCurrent`;
+  `createAppHost` exposes this internal service. Its `ipcMain.on(ol.QT)`
+  setup accepts a transferred Electron MessagePort only after the trusted IPC
+  check, then binds `createAppHost`/`registerAppView` to the sender.
+  `isTrustedIpcSender` checks registered web contents, uncovered account state,
+  main-frame identity and a trusted frame URL. This is not a Unix IPC endpoint
+  or permission for a plugin iframe/Node process to attach or impersonate a
+  Desktop renderer. No MessagePort injection, renderer attachment or trust
+  setting change was attempted.
+
+The full packed-JS search also located the same single first-party bridge
+registration selector and bridge extension already traced below. The remaining
+app-tools pipe literal matches describe WSL process-environment forwarding and
+LocalWork executor setup, not a new ordinary-plugin host catalog. This audit
+therefore closes a concrete search gap; it does **not** establish installed
+compatibility or a new usable transport. Further implementation of full parity
+now needs an authorized Desktop export or a documented plugin capability,
+not more guessed method names. No runtime feature is expanded by this finding.
+
 ### Additional app-tools evidence (not a plugin catalog implementation)
 
 The same public ZIP also contains `plugins/codex-app-tools/server.mjs`, retrieved
