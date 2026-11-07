@@ -23,6 +23,7 @@ Extracted files used (SHA256):
 
 | Relative ASAR path | SHA256 |
 | --- | --- |
+| `.vite/build/early-bootstrap-133-3bca9e88e9a413b4.js` | `c322a51d5cd65ee2a0243c61055166ebde455980a533fbbbb56c0a5c7bde0df9` |
 | `.vite/build/early-bootstrap.js` | `51417153f9c6a87d193b991c92641a0287b1a19f12525b18702ec6aff9bcf5df` |
 | `.vite/build/early-bootstrap-339-8cdc01c6be3ea2a7.js` | `187cb5bbfa90ce938c00c836a8fcdd9e45671e583246e74f37ec911cddf9e7ce` |
 | `.vite/build/early-bootstrap-854-5239e17d5abd99b3.js` | `87dae7cce26fcfe2d6f42d5bd955615fc73338023961174d37978093166ee893` |
@@ -37,8 +38,8 @@ Extracted files used (SHA256):
 | `webview/assets/async/652142.46d771a879.js` | `449e3f6270c2ed13183142d0a50cd42de1a50d6fa464d89baa3e98a389b5605a` |
 | `webview/assets/async/11147.784bd085db.js` | `59a5117e86f509825f640589479852e61ca846537718bbbc21a50fc41b6d443b` |
 
-The seven additional renderer entries above were checked against ASAR-header
-size, SHA256 and per-block SHA256 metadata. This verifies extraction consistency,
+The additional bootstrap133 and seven renderer entries above were checked
+against ASAR-header size, SHA256 and per-block SHA256 metadata. This verifies extraction consistency,
 not the whole archive's signature or the user's installed version.
 
 No downloaded Desktop code is committed or shipped. These hashes and lookup
@@ -124,6 +125,77 @@ These are viable Desktop-side building blocks. Safe automatic discovery still
 needs an explicitly exported read-only, host-scoped catalog channel or authorized
 executor integration that does not borrow a business/test session's identity.
 No discovery probe or installed app-tools enablement was performed.
+
+### Native caller admission and local executor routes
+
+A further bounded trace of the same public build distinguishes **caller**
+identity from the SSH **target**, rather than treating all hostId fields as
+interchangeable:
+
+- bootstrap854 lR requires caller source, call ID, namespace, caller thread,
+  tool and caller turn. Its lk schema admits native tools/call with caller host
+  eM.enum([sp.n, ei.iwv]).default(sp.n). bootstrap133 module 75211 resolves
+  sp.n to local; bootstrap entry module 85172 exports iw: "durable", reached
+  by ei.iwv. These are the native route's local and LocalWork/executor caller
+  contexts, **not** a restriction that prevents a tool's separately validated
+  arguments from targeting SSH. The separate per-host Desktop MCP forwarding
+  route can supply its bound caller host; its existence does not export that
+  connection to this plugin.
+- The bundled app-tools server's createCodexAppToolsMcpServer accepts caller
+  metadata from MCP _meta, including x-codex-turn-metadata, or the explicit
+  LocalWork --interaction-client-id. It rejects missing caller thread metadata
+  with "Codex app tools require thread metadata from the executor."
+  Native tools/list receives only threadStartKind, not a host/session query.
+  It lists tools, not chats. The first-party wrapper's fallback call/turn IDs
+  do not authorize Kanban to invent a caller or borrow a target session's
+  identity. The interaction-client option is not a read-only target selector.
+- bootstrap854 callDynamicAppTool selects a ready renderer, calls canCallTool,
+  then dispatches the request and waits for its call-ID result. Renderer182735
+  canCallTool rejects the ChatGPT caller source on this path and can read an
+  uncached caller thread. Its ysE7 execution module obtains caller follow-up
+  context, caller turn and stream role, then calls
+  dynamicToolCalls.tryClaimExecution before loading the actual dispatcher.
+  Thus this is caller-bound tool execution, not stateless read-only discovery.
+  wait_threads additionally observes the caller's steering/completion. No
+  caller claim, caller-thread read or native-pipe attach was performed.
+
+The signed native task routes also do not supply the missing SSH export:
+
+- lk validates taskThread/read with environment ID, thread ID, optional cursor,
+  limit 1–50 and a 64-hex nonce. Startup binds its callback to
+  readLocalTaskThread, which requires a ready executor with the **exact**
+  environment ID, an authenticated principal and supported app-server version;
+  it uses getLocalAppServerClient(). Signing the response does not change this
+  local scope.
+- taskProject/list is bound to listChildTaskProjects: it checks the same ready
+  executor/environment and returns projects.getLocalProjects(). It is not a
+  connected-SSH-host or thread catalog. taskProject/assign and
+  taskWorkspace/prepare perform assignment/workspace operations and are not
+  observation substitutes. None of these routes was called.
+- The nearby node_repl_host_services startup is gated by
+  eS && e_.x.isInternal(N). In this inspected registration its service map
+  contains only computer-use with an ensureServicePid callback, not an
+  app-server or SSH catalog. Neither the private pipe environment variable
+  nor an internal-build/security switch is enabled.
+
+Rechecked the public [MCP UI documentation](https://developers.openai.com/plugins/build/chatgpt-ui)
+and [remote connection documentation](https://learn.chatgpt.com/docs/remote-connections)
+on 2026-11-07. They describe the MCP Apps UI bridge and Desktop's host-local
+tools/configuration respectively, not a grant to an ordinary plugin to use the
+native app-tools pipe. Exact-string documentation searches did not establish a
+public CODEX_APP_TOOLS_PIPE_PATH or first-party-plugin-bridge contract. This
+bounded result is **not** proof that no supported export exists in another
+version. The user's installed version remains unknown; the user confirmed no
+Desktop bundle is available in this development environment.
+
+Source and repository-distribution MCP configs continue to forward only the
+existing board environment allowlist. They do not request native app-tools,
+host-services, caller identity, verifying identity or peer-authorization values.
+Startup fixtures supply poisoned synthetic values and verify the actual configs
+exclude them while preserving SSH observation/action opt-ins. This tests our
+startup contract, not authorization or behavior of a real Desktop pipe. The
+unchanged optional local launcher removes inherited native/caller values before
+launching Desktop; it is neither invoked nor used as an SSH export here.
 
 ### Existing control-socket transport candidate (not attached)
 
@@ -360,6 +432,20 @@ Reuse the Desktop-owned host services, not a competing backend:
   effects (known hydration/read/auto-response risks now documented), usage/input
   timestamps, host-routed current Git/artifacts/review and complete cross-host monitoring.
   **Full parity is not established or implemented by this commit.**
+
+For the next actual transport implementation, the missing prerequisite is an
+explicitly supplied, authorized Desktop export to the same connected host
+backend (or a documented ordinary-plugin host-service capability), with a
+verifiable installed version/handshake. It must provide connected-only host
+identity and bounded read/subscription semantics without implicit resume,
+ownership acquisition or caller-session writes. Catalog enumeration additionally
+needs authorization beyond the previously named observation pair. Actions need
+separate per-pair authorization, owner/lifetime checks and no uncertain retries;
+remote file/Git access must remain on that host. Merely providing a version
+number would help check compatibility, but would not create this export or
+authorize live catalog/action testing. No inert transport adapter, guessed
+native call, second backend or broad environment forwarding is added to fill
+that gap.
 
 Remote operations have not been tested live. Separate explicit authorization for
 the named test session is needed. Fixtures do not establish support in every

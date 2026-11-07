@@ -263,6 +263,15 @@ for (const { packaged, actions } of [
         HOME: home,
         PATH: process.env.PATH ?? "",
         CODEX_HOME: codexHome,
+        // Synthetic poison only: no real Desktop pipe, caller or key is read.
+        CODEX_APP_TOOLS_PIPE_PATH: join(home, "unverified-app-tools.sock"),
+        CODEX_APP_TOOLS_CALLER_HOST_ID: "durable",
+        CODEX_TASK_WORKSPACE_VERIFYING_IDENTITY: "unverified-fixture-key",
+        NODE_REPL_HOST_SERVICES_PIPE_PATH: join(
+          home,
+          "unverified-services.sock",
+        ),
+        CODEX_BROWSER_USE_PEER_AUTHORIZATION: "1",
         TASKBOARD_SSH_SESSIONS: JSON.stringify([
           { hostId, threadId: id },
           { hostId, threadId: agentId },
@@ -295,6 +304,15 @@ for (const { packaged, actions } of [
           supplied.TASKBOARD_SSH_SESSIONS,
         );
         assert.equal(env.TASKBOARD_SSH_ACTIONS, supplied.TASKBOARD_SSH_ACTIONS);
+        for (const key of [
+          "CODEX_APP_TOOLS_PIPE_PATH",
+          "CODEX_APP_TOOLS_CALLER_HOST_ID",
+          "CODEX_TASK_WORKSPACE_VERIFYING_IDENTITY",
+          "NODE_REPL_HOST_SERVICES_PIPE_PATH",
+          "CODEX_BROWSER_USE_PEER_AUTHORIZATION",
+        ]) {
+          assert.equal(env[key], undefined, key);
+        }
         await client.connect(transport);
         await client.callTool({ name: "taskboard_open", arguments: {} });
         const readSnapshot = async () => {

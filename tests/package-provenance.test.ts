@@ -24,6 +24,27 @@ test("fork distribution has matching source UI, launch config and content-addres
   assert.deepEqual(config.env_vars, sourceConfig.env_vars);
   assert.ok(config.env_vars.includes("TASKBOARD_SSH_SESSIONS"));
   assert.ok(config.env_vars.includes("TASKBOARD_SSH_ACTIONS"));
+  // Native Desktop services need a verified export, not inherited pipe/caller
+  // identities or a peer-authorization switch in an ordinary plugin config.
+  for (const definition of [sourceConfig, config]) {
+    assert.deepEqual(definition.env_vars, [
+      "HOME",
+      "PATH",
+      "CODEX_HOME",
+      "TASKBOARD_WS_URL",
+      "TASKBOARD_SSH_SESSIONS",
+      "TASKBOARD_SSH_ACTIONS",
+    ]);
+    for (const key of [
+      "CODEX_APP_TOOLS_PIPE_PATH",
+      "CODEX_APP_TOOLS_CALLER_HOST_ID",
+      "CODEX_TASK_WORKSPACE_VERIFYING_IDENTITY",
+      "NODE_REPL_HOST_SERVICES_PIPE_PATH",
+      "CODEX_BROWSER_USE_PEER_AUTHORIZATION",
+    ]) {
+      assert.equal(definition.env?.[key], undefined, key);
+    }
+  }
   assert.deepEqual(config.args, ["./scripts/start-mcp.sh"]);
   assert.deepEqual(ui, await readFile("dist/ui/index.html"));
   assert.match(ui.toString(), /SSH navigation is disabled/);

@@ -26,6 +26,13 @@ Base: `51a96afdbdd8d427c02bb03c4a0cabacc6ac0e25`.
   one. See [research evidence and provenance](SSH-PROTOCOL-RESEARCH.md).
   This supersedes the earlier lack-of-bundle conclusion, but not the absence
   of a verified external SSH session/connected-host catalog route.
+- Further static tracing distinguishes native app-tools caller identity from
+  SSH tool targets. Its signed task/project reads are local executor routes;
+  the inspected internal host-services registry is not an SSH export. Neither
+  native pipe/caller metadata forwarding nor first-party bridge spoofing is
+  enabled. These internal services do not establish full parity for ordinary
+  plugins. Installed-version and authorized transport verification are still
+  required; see the research document for reproducible anchors and limits.
 - Host-aware `codex://threads/<id>?hostId=...` navigation exists in this bundle.
   Static tracing shows opening can hydrate/resume, acquire ownership, change
   read state and participate in Desktop's pending-question auto-response timers.
