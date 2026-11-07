@@ -30,6 +30,7 @@ import {
 import {
   deleteWorkItem,
   openConversation,
+  SSH_NAVIGATION_DISABLED,
   readWorkReview,
   readWorkspace,
   saveWorkItem,
@@ -574,7 +575,7 @@ export function WorkItems({
                             disabled={id.startsWith("ssh:")}
                             title={
                               id.startsWith("ssh:")
-                                ? "SSH navigation is unverified; open in Codex Desktop."
+                                ? SSH_NAVIGATION_DISABLED
                                 : undefined
                             }
                             onClick={() =>

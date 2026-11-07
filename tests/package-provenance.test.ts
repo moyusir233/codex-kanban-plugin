@@ -26,6 +26,8 @@ test("fork distribution has matching source UI, launch config and content-addres
   assert.ok(config.env_vars.includes("TASKBOARD_SSH_ACTIONS"));
   assert.deepEqual(config.args, ["./scripts/start-mcp.sh"]);
   assert.deepEqual(ui, await readFile("dist/ui/index.html"));
+  assert.match(ui.toString(), /SSH navigation is disabled/);
+  assert.match(ui.toString(), /auto-answer pending questions/);
   assert.deepEqual(
     await readFile(join(root, "scripts/start-mcp.sh")),
     await readFile("scripts/start-mcp.sh"),
@@ -70,6 +72,7 @@ test("fork distribution has matching source UI, launch config and content-addres
       "runtime/server/index.mjs",
       "runtime/ui/index.html",
       "SSH-SESSIONS.md",
+      "SSH-PROTOCOL-RESEARCH.md",
     ]) {
       assert.deepEqual(
         await readFile(join(offline, path)),
@@ -94,6 +97,8 @@ test("fork distribution has matching source UI, launch config and content-addres
       ".mcp.json",
       "runtime/server/index.mjs",
       "runtime/ui/index.html",
+      "SSH-SESSIONS.md",
+      "SSH-PROTOCOL-RESEARCH.md",
     ]) {
       assert.deepEqual(
         execFileSync("/usr/bin/unzip", ["-p", zip, path], {

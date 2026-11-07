@@ -112,11 +112,26 @@ export async function readSnapshot(
   if (!validSnapshot(value)) throw new Error("收到的状态数据格式不受支持");
   return value;
 }
-export async function openConversation(id: string, hostId?: string) {
-  if (!isLocalSession({ hostId }))
-    throw new Error(
-      "SSH session navigation is unverified. Open it in Codex Desktop.",
+export const SSH_NAVIGATION_DISABLED =
+  "SSH navigation is disabled. Desktop may resume the session, change ownership/read state, or auto-answer pending questions. Open in Codex Desktop only if you intend those effects.";
+
+/** Explicit remote routing in manual links is subject to the same deny gate. */
+export function isSshNavigationLink(url: string): boolean {
+  try {
+    const target = new URL(url);
+    return (
+      target.protocol === "codex:" &&
+      ["hostId", "realtimeVoiceHostId"].some((key) =>
+        target.searchParams.getAll(key).some((hostId) => hostId !== "local"),
+      )
     );
+  } catch {
+    return false; // Invalid URLs are rejected by the existing open-link check.
+  }
+}
+
+export async function openConversation(id: string, hostId?: string) {
+  if (!isLocalSession({ hostId })) throw new Error(SSH_NAVIGATION_DISABLED);
   if (!/^[0-9a-f-]{36}$/i.test(id)) throw new Error("对话 ID 格式无效");
   const url = `codex://threads/${id}`;
   if (app) {
@@ -128,8 +143,12 @@ export async function openConversation(id: string, hostId?: string) {
 
 /** 成果链接交给宿主打开，避免在看板的 iframe 内导航。 */
 export async function openArtifactLink(url: string) {
-  if (!["http:", "https:", "codex:"].includes(new URL(url).protocol))
+  const target = new URL(url);
+  if (!["http:", "https:", "codex:"].includes(target.protocol))
     throw new Error("成果链接需使用 HTTP、HTTPS 或 Codex 地址。");
+  // A manually saved deep link must not bypass the SSH card's navigation gate.
+  // Check every value: duplicate routing keys cannot authorize a remote target.
+  if (isSshNavigationLink(url)) throw new Error(SSH_NAVIGATION_DISABLED);
   await connect();
   if (app) {
     const result = await app.openLink({ url });

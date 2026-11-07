@@ -299,7 +299,12 @@ for (const { packaged, actions } of [
             status: "planned",
             threadIds: [id],
             checklist: [],
-            links: [],
+            links: [
+              {
+                label: "Fixture remote navigation blocked",
+                url: `codex://threads/${id}?hostId=${hostId}`,
+              },
+            ],
           },
         });
         assert.ok(!saved.isError);
@@ -340,6 +345,11 @@ for (const { packaged, actions } of [
           this.removeAttribute("open");
         };
         const paths: string[] = [];
+        const openedLinks: string[] = [];
+        window.open = ((url: string) => {
+          openedLinks.push(url);
+          return null;
+        }) as any;
         const observations: string[][] = [];
         window.matchMedia = ((query: string) => ({
           matches: false,
@@ -442,6 +452,11 @@ for (const { packaged, actions } of [
           remoteCard().querySelector<HTMLButtonElement>(".thread-card-open")
             ?.disabled,
           true,
+        );
+        assert.match(
+          remoteCard().querySelector<HTMLButtonElement>(".thread-card-open")!
+            .title,
+          /resume.*ownership[/]read state.*auto-answer/,
         );
         assert.ok(remoteCard().querySelector(".thread-work-items"));
         assert.ok(
@@ -800,6 +815,30 @@ for (const { packaged, actions } of [
         assert.equal(links[0].disabled, false);
         assert.equal(links[1].disabled, true);
         assert.ok(links[1].textContent?.includes("Fixture remote ordinary"));
+        assert.match(links[1].title, /auto-answer pending questions/);
+        const manualLink = [
+          ...window.document.querySelectorAll<HTMLAnchorElement>(
+            ".work-artifacts a",
+          ),
+        ].find((link) =>
+          link.textContent?.includes("Fixture remote navigation blocked"),
+        )!;
+        assert.ok(manualLink);
+        assert.equal(manualLink.getAttribute("href"), null);
+        assert.equal(manualLink.getAttribute("aria-disabled"), "true");
+        assert.match(manualLink.title, /resume.*auto-answer/);
+        manualLink.click();
+        await until(
+          () =>
+            !!window.document
+              .querySelector(".data-notice")
+              ?.textContent?.includes("SSH navigation is disabled"),
+        );
+        assert.deepEqual(
+          openedLinks,
+          [],
+          "Blocked link never reaches navigation",
+        );
         window.document.querySelector<HTMLElement>(".work-card")!.click();
         await until(() => !!window.document.querySelector(".thread-picker"));
         const options = [

@@ -2,7 +2,13 @@ import { useId, useState } from "react";
 import { ExternalLink, FileText, GitPullRequest } from "lucide-react";
 import type { ThreadLink } from "../shared/types";
 import type { DetectedArtifact, WorkItem } from "../shared/work-items";
-import { openArtifactLink, openConversation, openDetectedFile } from "./client";
+import {
+  openArtifactLink,
+  openConversation,
+  openDetectedFile,
+  isSshNavigationLink,
+  SSH_NAVIGATION_DISABLED,
+} from "./client";
 import { useI18n } from "./i18n";
 
 /** 看板和工作事项共用成果列表，默认显示三条，方案文件交给 Codex 原生预览。 */
@@ -42,7 +48,13 @@ export function DetectedArtifacts({
             {visibleLinks.map((link, index) => (
               <a
                 key={`${link.url}-${index}`}
-                href={link.url}
+                href={isSshNavigationLink(link.url) ? undefined : link.url}
+                aria-disabled={isSshNavigationLink(link.url) || undefined}
+                title={
+                  isSshNavigationLink(link.url)
+                    ? SSH_NAVIGATION_DISABLED
+                    : undefined
+                }
                 onClick={(event) => {
                   event.preventDefault();
                   void openArtifactLink(link.url).catch(report);
@@ -76,8 +88,19 @@ export function DetectedArtifacts({
                   {artifact.kind !== "planFile" ? (
                     <a
                       className="detected-artifact-target"
-                      href={artifact.url}
-                      title={artifact.url}
+                      href={
+                        isSshNavigationLink(artifact.url)
+                          ? undefined
+                          : artifact.url
+                      }
+                      aria-disabled={
+                        isSshNavigationLink(artifact.url) || undefined
+                      }
+                      title={
+                        isSshNavigationLink(artifact.url)
+                          ? SSH_NAVIGATION_DISABLED
+                          : artifact.url
+                      }
                       onClick={(event) => {
                         event.preventDefault();
                         void openArtifactLink(artifact.url).catch(report);

@@ -234,9 +234,43 @@ test("remote conversation navigation fails closed before any host action", async
         "00000000-0000-4000-8000-000000000001",
         "fixture-ssh",
       ),
-      /navigation is unverified/,
+      /SSH navigation is disabled/,
     );
     assert.deepEqual(opened, []);
     assert.deepEqual(calls, []);
+  });
+});
+
+test("manual remote Codex links cannot bypass the conversation navigation gate", async () => {
+  await hostFixture(true, async (client, opened, calls) => {
+    const base = "codex://threads/00000000-0000-4000-8000-000000000001";
+    for (const query of [
+      "hostId=fixture-ssh",
+      "hostId=local&hostId=fixture-ssh",
+      "hostId=fixture-ssh&hostId=local",
+      "%68ostId=fixture%2Dssh",
+      "hostId=",
+      "realtimeVoiceHostId=fixture-ssh",
+      "hostId=local&realtimeVoiceHostId=fixture-ssh",
+    ]) {
+      await assert.rejects(client.openArtifactLink(`${base}?${query}`), {
+        message: client.SSH_NAVIGATION_DISABLED,
+      });
+    }
+    // Both the direct conversation and manual-link gates reject before any
+    // handshake, tool call, native file open, deep link or browser fallback.
+    assert.deepEqual(opened, []);
+    assert.deepEqual(calls, []);
+    for (const url of [
+      base,
+      `${base}?hostId=local`,
+      "https://fixture.invalid/artifact",
+    ])
+      await client.openArtifactLink(url);
+    assert.deepEqual(calls, [
+      `openLink:${base}`,
+      `openLink:${base}?hostId=local`,
+      "openLink:https://fixture.invalid/artifact",
+    ]);
   });
 });

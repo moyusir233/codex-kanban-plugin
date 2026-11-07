@@ -29,6 +29,14 @@ Extracted files used (SHA256):
 | `webview/assets/async/182735.d1916dd704.js` | `5a3b8967a8021db6a7a09c1f1ce7ec247d17e98c16b9156b5e7dd8a086e3268e` |
 | `webview/assets/async/497066.82fad48b12.js` | `2ba588450e9173dded25dca0163c917f5375237f868f3cdf82df3e488462946f` |
 | `webview/assets/async/783456.a3b05bbbc0.js` | `f2d60b65162e707ce6871c193c7bb105b8dba82a3b7de72c18724accaaba79e9` |
+| `webview/assets/async/220821.b4a9b80850.js` | `518b237feac8cceb1d04dfc8f11d2327694892e32108f3c9eb740822a56bf1da` |
+| `webview/assets/async/884779.bf167971f9.js` | `cdc694546dbda438c12a929e692381b1c8c186d4cad9257e69ad5b4163d72d84` |
+| `webview/assets/async/110557.82455d0c53.js` | `b482ebb230fd3580c79da876ad699f0f82cdb47f04eab49a49188fd9c69732a3` |
+| `webview/assets/async/352584.4e31b3db06.js` | `f9eecbd4ae11f154a6f5fe400b71103fbd34dda3e18a4d0a72769108c033167b` |
+
+The four additional renderer entries above were checked against ASAR-header
+size, SHA256 and per-block SHA256 metadata. This verifies extraction consistency,
+not the whole archive's signature or the user's installed version.
 
 No downloaded Desktop code is committed or shipped. These hashes and lookup
 anchors describe reproducible evidence, not a stable public API contract.
@@ -139,12 +147,75 @@ and is not proof of user-message time. Local readers and behavior are unchanged.
 
 bootstrap339 parses `codex://threads/<uuid>?hostId=...` into a host-aware
 `localConversation`. bootstrap854's matching case forwards hostId into the
-renderer query. Renderer182735 retains host identity in parsing/route state.
-A host-aware link therefore exists.
+renderer query. Renderer182735 route parser `O` retains host identity; `nf3G`
+prioritizes the route host in ordinary page context. Renderer110557 `Pyfq` obtains
+that context host, sets the explicit `tl5a.Nu` override and retains the active
+conversation. `Bl6U.qX` prioritizes the `JBvZ.Cg` override over discovered hosts
+and its local fallback. A host-aware link therefore exists, but URL parsing
+alone does not prove a safe read-only navigation API or effect ordering.
 
-However, complete hydration/resume/read-state effects and installed-version
-compatibility remain unverified. Remote links stay disabled rather than being
-enabled from URL shape alone. No links were opened during research.
+The additional trace establishes reasons to keep it disabled:
+
+1. Renderer884779 `KVWT`, `aF` enables resume by default and calls `osEl.Y`.
+   The `J.N` query helper in this page is **`t0b9`**, which reads
+   `realtimeVoiceHostId`, not ordinary `hostId`. It must not be mistaken for
+   proof of ordinary host routing; the context/override chain above is separate.
+2. Renderer220821 `osEl` calls the effective host manager's
+   `resumeConversation({intent: "open", ...})`, with
+   `showThreadGoalResumeConfirmation: false`. The hook has retry/hydration
+   effects. bootstrap854's `resumeConversation` and resume coordinator can read
+   catalog/config/history, set an owner role when none exists and call
+   `thread/resume`. An already resumed owner/follower can take a shorter path;
+   that does not make opening an arbitrary session read-only. The board does
+   not invoke this route to get more metadata.
+3. Renderer884779's ordinary transcript installs `eDYz.I` (renderer182735)
+   unless hidden/covered. That watcher handles unread/turn state and invokes
+   `markConversationAsRead` on the effective host. bootstrap854's
+   `acknowledgeRead` / `sendReadReceipt` can perform `thread/read` and conditional
+   `thread/readState/update` with the expected revision. This is an ordinary
+   page effect, not merely a command-menu mark-read action.
+4. Renderer110557 / renderer352584 `Pyfq` calls
+   `requestUserInputAutoResolution.setConversationPresented` on mount/cleanup
+   and records key/pointer activity. bootstrap854 `edO` routes it through
+   `getConnection(hostId)`. bootstrap339 **`class rm`** tracks non-blocking
+   `item/tool/requestUserInput` and eligible MCP elicitation requests. In the
+   configured foreground-inactivity mode, presentation/activity can restart
+   a 60-second inactivity wait, followed by a 90-second countdown; background
+   handling and explicit elicitation timeouts differ. On timeout it calls
+   `submitEmptyResponse` or `declineMcpElicitation`. The connection constructor
+   binds these to `handleClientResponse` with `{answers: {}}` or
+   `{action: "decline", ...}`. This does **not** auto-approve command/file
+   requests and does not prove every pending question will time out. It shows
+   that opening participates in an existing automatic-response lifecycle, not
+   just a display lifecycle. The timer may already run without opening.
+
+No link was opened, timer executed, owner acquired or live session changed in
+this research. No Desktop setting was inspected or modified. Installed-version
+compatibility, hydration ordering and the complete effects remain unverified.
+There is no demonstrated link flag that suppresses all of these effects. Do not
+invent one or offer a purported read-only link by changing URL shape.
+
+The fork now also rejects **explicit remote** `codex:` routes in the generic
+artifact/manual-link opener before handshake, tool/network calls or native link
+dispatch. It checks every `hostId` / `realtimeVoiceHostId` query value, including
+duplicates. Manual and detected remote links have no navigable href; SSH cards
+and collection buttons remain disabled with a side-effect warning. Local links
+and ordinary HTTP(S) artifacts retain their existing behavior. This is not a
+claim to inspect destinations behind arbitrary web redirects or every private
+future Desktop route. Source/distribution UI and host-bridge fixtures exercise
+the denial; no navigation opt-in or new control method is added.
+
+### Usage and input evidence boundary
+
+bootstrap854 `thread/tokenUsage/updated` stores token usage on the conversation
+and the `tokenUsageInfo` selector exposes it only for a resumed conversation.
+This trace still does not bind the value to the board's current turn ID, so it
+cannot safely populate the existing per-turn cumulative token counter. Opening
+or resuming to populate it would violate snapshot-only observation. The user
+message reconciliation anchors `openingUserMessageId`, `clientUserMessageId`
+and `itemsPagination.oldestUserInput` describe message identity/content, not a
+demonstrated user-send timestamp. Turn timing is not a substitute. No extra
+history read or free-form message extraction was added; these fields stay unknown.
 
 ## Feasible parity path and unfinished work
 
@@ -157,7 +228,8 @@ Reuse the Desktop-owned host services, not a competing backend:
   retention, host-safe collections and local filesystem exclusion. Snapshot-only
   validated turn timing now supplements these without loading history.
 - **Unfinished:** supported catalog/host discovery export, installed-version
-  and authorized live acceptance, navigation side-effect verification, usage/input
+  and authorized live acceptance, a navigation route with acceptable verified
+  effects (known hydration/read/auto-response risks now documented), usage/input
   timestamps and host-routed Git/artifacts/review/monitoring. **Full parity is not
   established or implemented by this commit.**
 

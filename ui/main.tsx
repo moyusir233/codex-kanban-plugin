@@ -41,6 +41,7 @@ import {
 import {
   launchLiveConnection,
   openConversation,
+  SSH_NAVIGATION_DISABLED,
   readSnapshot,
   readThreadArtifacts,
   readWorkspace,
@@ -1169,7 +1170,7 @@ function ThreadCard({
         title={
           local
             ? t("打开对话：{title}", { title: thread.title })
-            : "SSH navigation is unverified; open in Codex Desktop. Opening may change loaded/read state."
+            : SSH_NAVIGATION_DISABLED
         }
         aria-label={t("打开对话：{title}", { title: thread.title })}
         aria-describedby={`thread-context-${key} thread-input-${key}`}

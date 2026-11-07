@@ -27,9 +27,11 @@ Base: `51a96afdbdd8d427c02bb03c4a0cabacc6ac0e25`.
   This supersedes the earlier lack-of-bundle conclusion, but not the absence
   of a verified external SSH session/connected-host catalog route.
 - Host-aware `codex://threads/<id>?hostId=...` navigation exists in this bundle.
-  Its complete load/resume/read effects and compatibility with the user's
-  installed version remain unverified. SSH card and collection navigation
-  stay disabled; no navigation or ownership-acquisition experiment was performed.
+  Static tracing shows opening can hydrate/resume, acquire ownership, change
+  read state and participate in Desktop's pending-question auto-response timers.
+  Complete effects and compatibility with the user's installed version remain
+  unverified. SSH card and collection navigation stay disabled; no navigation
+  or ownership-acquisition experiment was performed.
 
 ## Explicit opt-in
 
@@ -132,7 +134,14 @@ a reference does not register, subscribe to or resume that thread. Unavailable
 references remain removable. Local metadata/artifact readers exclude even
 malformed `ssh:` keys before any local lookup or worker scheduling. SSH cwd is
 display-only; remote history, Git, automatic artifacts and review remain disabled.
-Remote collection links cannot navigate. No database migration is required; older
+Remote collection links cannot navigate. Explicit remote `codex:` manual/artifact
+links are also denied before any host call and have no navigable href. Duplicate
+`hostId` / `realtimeVoiceHostId` query values cannot bypass the denial. The warning
+mentions resume, ownership/read state and pending-question auto-response effects;
+it does not claim Desktop auto-approves commands or that every question times out.
+Local links and ordinary HTTP(S) artifacts remain unchanged; arbitrary website
+redirects and future private Desktop routes are not verified by this guard.
+No navigation opt-in has been added. No database migration is required; older
 upstream clients do not understand SSH association keys, so editing mixed-host
 collections should use this fork rather than an older installed package.
 
@@ -142,7 +151,7 @@ collections should use this fork rather than an older installed package.
 | Runtime/unread/model/mode/goal | Existing local sources | Observed supported fields only; loss means unknown |
 | Question/failure display | Existing Desktop/history parsing | Known shape from received snapshot only; read-only |
 | Collections | Existing plugin-owned records | Host-scoped association, picker, tags and search |
-| Open session | Existing local deep link | Host route established statically; disabled pending load/read compatibility checks |
+| Open session | Existing local deep link | Disabled: known resume/ownership/read/auto-response risks; installed compatibility unverified |
 | Discovery | Existing local index/listing | No verified read-only Desktop SSH listing route |
 | Approvals/answers/execution | Existing local controls | Default denied; explicit per-pair opt-in uses current owner, fixture-tested only |
 | Turn timing | Existing local sources | Validated fields from received snapshot only; cleared on loss |
@@ -191,7 +200,9 @@ collections should use this fork rather than an older installed package.
   identical local/remote IDs and multiple-host persistence isolation.
   Action fixtures additionally cover MCP startup allowlists, built UI decisions,
   wire versions, same-ID hosts, owner/revision races, legacy relay denial, async
-  start/steer and duplicates. No new live observation or session mutation was performed.
+  start/steer and duplicates. Navigation fixtures cover manual remote link denial,
+  duplicate/encoded route keys, absence of a navigable href, side-effect warnings
+  and unchanged local host links. No new live observation or session mutation was performed.
 - No session storage reads, security changes, host/plugin installation,
   website deployment, publication, merge, or upstream PR is needed.
 
