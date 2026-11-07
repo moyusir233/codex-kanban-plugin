@@ -52626,6 +52626,50 @@ ${JSON.stringify(replies)}
   }
 };
 
+// server/ssh-turn-timing.ts
+var milliseconds = (value) => typeof value === "number" && Number.isSafeInteger(value) && value >= 0;
+function sshTurnTiming(state, observedAt) {
+  if (!state || !Number.isFinite(Date.parse(observedAt))) return null;
+  try {
+    if (state.turnHistory?.kind === "canonical") {
+      const islands = state.turnHistory.history?.islands;
+      if (!Array.isArray(islands) || islands.at(-1)?.newerBoundary?.status !== "exhausted")
+        return null;
+      const lastEntry = islands.at(-1)?.entries?.at(-1);
+      const last = state.turnHistory.history?.entitiesByKey?.[lastEntry?.value];
+      if (lastEntry && typeof (last?.turnId ?? last?.id) !== "string")
+        return null;
+    }
+    const turns = desktopTurns(state);
+    const turn = turns.at(-1);
+    const tail = Array.isArray(state.turns) ? state.turns.at(-1) : null;
+    if (Array.isArray(state.turns) && state.turns.length > 0 && typeof (tail?.turnId ?? tail?.id) !== "string" || !turn)
+      return null;
+    const id = turn.turnId ?? turn.id;
+    if (typeof id !== "string" || !id.length || !["inProgress", "completed", "interrupted"].includes(turn.status))
+      return null;
+    const start = milliseconds(turn.turnStartedAtMs) ? new Date(turn.turnStartedAtMs) : null;
+    const startedAt = start && Number.isFinite(start.getTime()) ? start.toISOString() : null;
+    if (turn.status === "inProgress" && (state.threadRuntimeStatus?.type !== "active" || start && start.getTime() > Date.parse(observedAt)))
+      return null;
+    const durationMs = turn.status !== "inProgress" && milliseconds(turn.durationMs) ? turn.durationMs : null;
+    if (turn.status !== "inProgress" && durationMs === null) return null;
+    if (startedAt === null && durationMs === null) return null;
+    return {
+      id,
+      status: turn.status,
+      startedAt,
+      completedAt: null,
+      updatedAt: observedAt,
+      durationMs,
+      tokens: null,
+      userInput: null
+    };
+  } catch {
+    return null;
+  }
+}
+
 // server/ssh-sessions.ts
 var targets = external_exports.array(
   external_exports.object({
@@ -52664,6 +52708,7 @@ function sshActionTargets(value, registered) {
 }
 function sshSessionThread(target, conversation) {
   const state = conversation?.state;
+  const observedAt = (/* @__PURE__ */ new Date()).toISOString();
   const collaboration = state?.latestCollaborationMode?.mode ?? state?.latestCollaborationMode;
   const rawStatus = state?.threadRuntimeStatus;
   const runtime = rawStatus && ["active", "idle", "notLoaded", "systemError"].includes(rawStatus.type) ? {
@@ -52713,10 +52758,10 @@ function sshSessionThread(target, conversation) {
       "budgetLimited",
       "complete"
     ].includes(state?.threadGoal?.status) ? state.threadGoal.status : null,
-    turnUsage: null,
+    turnUsage: sshTurnTiming(state, observedAt),
     unread: typeof state?.hasUnreadTurn === "boolean" ? state.hasUnreadTurn : null,
     runtime,
-    runtimeAt: conversation ? (/* @__PURE__ */ new Date()).toISOString() : null,
+    runtimeAt: conversation ? observedAt : null,
     fresh: !!conversation,
     error: failed && conversation ? {
       message: "\u672C\u8F6E\u6267\u884C\u5931\u8D25\uFF0C\u8BF7\u5728\u539F\u5BF9\u8BDD\u67E5\u770B\u8BE6\u60C5\u3002",

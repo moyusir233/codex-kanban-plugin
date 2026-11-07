@@ -102,6 +102,15 @@ for (const { packaged, actions } of [
             cwd: "/REMOTE_NOT_LOCAL",
             threadRuntimeStatus: { type: "active", activeFlags: [] },
             latestCollaborationMode: { mode: "plan" },
+            turns: [
+              {
+                turnId: "fixture-timing-turn",
+                status: "inProgress",
+                turnStartedAtMs: Date.now() - 2000,
+                items: [],
+              },
+            ],
+            latestTokenUsageInfo: { total: { totalTokens: 987654 } },
           },
         ],
         [
@@ -421,6 +430,14 @@ for (const { packaged, actions } of [
           "SSH card reaches the running lane through actual board filters",
         );
         assert.ok(remoteCard().textContent?.includes("Plan mode"));
+        assert.ok(remoteCard().textContent?.includes("Tokens unknown"));
+        assert.ok(!remoteCard().textContent?.includes("Duration unknown"));
+        const timingThread = snapshot.threads.find(
+          (thread) => thread.id === id && thread.hostId === hostId,
+        )!;
+        assert.equal(timingThread.turnUsage?.id, "fixture-timing-turn");
+        assert.equal(timingThread.turnUsage?.tokens, null);
+        assert.equal(timingThread.lastUserMessageAt, null);
         assert.equal(
           remoteCard().querySelector<HTMLButtonElement>(".thread-card-open")
             ?.disabled,
@@ -513,6 +530,12 @@ for (const { packaged, actions } of [
         respondToFollows = false;
         sockets.at(-1)!.destroy();
         await until(() => cards().length === 0);
+        assert.equal(
+          (await readSnapshot()).threads.find(
+            (thread) => thread.id === id && thread.hostId === hostId,
+          )?.turnUsage,
+          null,
+        );
         const lostAt = observations.length;
         await until(
           () =>
@@ -527,6 +550,9 @@ for (const { packaged, actions } of [
         respondToFollows = true;
         sendSnapshot(sockets.at(-1)!, id, hostId);
         await until(() => !!remoteCard()?.closest(".lane--green"));
+        await until(
+          () => !remoteCard().textContent?.includes("Duration unknown"),
+        );
         // Attention scope hides a disconnected unread card too.
         states.get(remoteKey).hasUnreadTurn = true;
         sendSnapshot(sockets.at(-1)!, id, hostId);

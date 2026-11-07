@@ -27,6 +27,8 @@ Extracted files used (SHA256):
 | `.vite/build/early-bootstrap-339-8cdc01c6be3ea2a7.js` | `187cb5bbfa90ce938c00c836a8fcdd9e45671e583246e74f37ec911cddf9e7ce` |
 | `.vite/build/early-bootstrap-854-5239e17d5abd99b3.js` | `87dae7cce26fcfe2d6f42d5bd955615fc73338023961174d37978093166ee893` |
 | `webview/assets/async/182735.d1916dd704.js` | `5a3b8967a8021db6a7a09c1f1ce7ec247d17e98c16b9156b5e7dd8a086e3268e` |
+| `webview/assets/async/497066.82fad48b12.js` | `2ba588450e9173dded25dca0163c917f5375237f868f3cdf82df3e488462946f` |
+| `webview/assets/async/783456.a3b05bbbc0.js` | `f2d60b65162e707ce6871c193c7bb105b8dba82a3b7de72c18724accaaba79e9` |
 
 No downloaded Desktop code is committed or shipped. These hashes and lookup
 anchors describe reproducible evidence, not a stable public API contract.
@@ -72,6 +74,67 @@ exists in every version. Do not send guessed RPC names, scrape restricted catalo
 files or run a second SSH backend as a substitute for Desktop's connection.
 Explicit pair registration remains required pending a supported export/transport.
 
+### Additional app-tools evidence (not a plugin catalog implementation)
+
+The same public ZIP also contains `plugins/codex-app-tools/server.mjs`, retrieved
+as a complete ZIP entry and CRC checked, never executed or installed. SHA256:
+`f0f5230dd7701317bc9dafb589901eb24fc504d9b92520169e934278ed5a82e8`.
+Its `.mcp.json` SHA256 is
+`f1fa5c72fb610a448a59fa9a4bcba75553afa908394d0fce179602d9658e2495`.
+The full-archive/signature and installed-version qualifications above also apply.
+
+- The bundled server obtains a catalog with native-pipe `tools/list`. Calls use
+  `CODEX_APP_TOOLS_PIPE_PATH` and require **executor-provided** thread metadata.
+  Without it, the server rejects the call. Caller thread/turn, source, call ID,
+  namespace and host are distinct from the target host/thread in tool arguments.
+- bootstrap854 `lk`, `ld`, `dynamic_app_tools_peer_rejected` and the pipe startup
+  establish schema validation, a 0600 socket and a socket peer authorizer.
+  On Darwin the authorizer can load the native authorization addon according to
+  package build flavor. It is not evidence that arbitrary plugin Node processes
+  are accepted. No environment/security switch is changed to bypass this.
+- Renderer182735 `canCallTool` can read an uncached **caller** thread before
+  dispatch. `ysE7` obtains the caller turn/context and claims tool-call execution.
+  This is not a stateless catalog endpoint usable with fabricated identities.
+- Renderer182735 `MCYz` and `pKpp`, then renderer497066 `case A.En`, `case f.cq`,
+  `tO`, `tk`, `tS` and `case A.Dv`, establish actual handlers rather than names
+  alone. `list_hosts` reports **enabled configured** remote hosts/workspace
+  roots, not connected-only hosts. History-mode `list_threads` checks the
+  connected-host registry and calls the existing host manager's `thread/list`.
+  Recent mode can also read pinned-thread summaries and queries ChatGPT data;
+  it is inappropriate for a bounded named-session-only experiment. `read_thread`
+  routes host-aware metadata/turn reads; it is not used to enrich this board.
+- bootstrap854 `Desktop MCP did not bind a loopback port` and
+  `ssh_websocket_v0.desktop_mcp_setup_failed` establish a separate per-host
+  bearer-authenticated MCP endpoint and verified SSH forwarding. That config
+  is supplied to Desktop-managed executors, not an established external Kanban
+  API. No token/socket scan, credential reuse or second backend is attempted.
+
+These are viable Desktop-side building blocks. Safe automatic discovery still
+needs an explicitly exported read-only, host-scoped catalog channel or authorized
+executor integration that does not borrow a business/test session's identity.
+No discovery probe or installed app-tools enablement was performed.
+
+## Snapshot-only turn timing
+
+bootstrap854 `bG` normalizes `turnStartedAtMs` into numeric milliseconds and
+preserves `durationMs`. Its turn conversion maps app-server `startedAt` into that
+field; `turn/completed` updates status and duration. These fields are already
+published with conversation snapshots. `finalAssistantStartedAtMs` can mark
+final-answer start, so it must **not** serve as completion time.
+
+This fork now displays validated snapshot start time for an active in-progress
+turn and explicit terminal duration for completed/interrupted turns. It uses
+only the existing snapshot, with no history loading or remote file access.
+Canonical history must reach the newest exhausted boundary, live overlay wins,
+and unbound placeholders/malformed timing stay unknown. A terminal turn without
+duration does not use observation time as its execution end. Disconnect and
+cache restoration clear this timing; only a live replacement restores it.
+
+`thread/tokenUsage/updated` stores `latestTokenUsageInfo` on the conversation,
+not a demonstrated per-turn total. Tokens, free-form input and last-user-message
+time remain unknown. Turn start can represent synthesized/automatic continuation
+and is not proof of user-message time. Local readers and behavior are unchanged.
+
 ## Navigation evidence and side effects
 
 bootstrap339 parses `codex://threads/<uuid>?hostId=...` into a host-aware
@@ -91,10 +154,11 @@ Reuse the Desktop-owned host services, not a competing backend:
   exact wire versions, owner/revision/connection verification, stale/duplicate
   handling, MCP environment forwarding and source/distribution UI fixtures.
 - **Already implemented:** explicit observation, non-live filtering metadata
-  retention, host-safe collections and local filesystem exclusion.
+  retention, host-safe collections and local filesystem exclusion. Snapshot-only
+  validated turn timing now supplements these without loading history.
 - **Unfinished:** supported catalog/host discovery export, installed-version
   and authorized live acceptance, navigation side-effect verification, usage/input
-  timing and host-routed Git/artifacts/review/monitoring. **Full parity is not
+  timestamps and host-routed Git/artifacts/review/monitoring. **Full parity is not
   established or implemented by this commit.**
 
 Remote operations have not been tested live. Separate explicit authorization for

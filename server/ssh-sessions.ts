@@ -2,6 +2,7 @@ import { z } from "zod";
 import { sessionKey, type SessionTarget } from "../shared/session-identity.js";
 import type { Thread } from "../shared/types.js";
 import type { DesktopConversation } from "./desktop-ipc.js";
+import { sshTurnTiming } from "./ssh-turn-timing.js";
 import {
   desktopInputState,
   desktopTurns,
@@ -69,6 +70,7 @@ export function sshSessionThread(
   conversation?: DesktopConversation,
 ): Thread {
   const state = conversation?.state;
+  const observedAt = new Date().toISOString();
   const collaboration =
     state?.latestCollaborationMode?.mode ?? state?.latestCollaborationMode;
   const rawStatus = state?.threadRuntimeStatus;
@@ -146,11 +148,11 @@ export function sshSessionThread(
     ].includes(state?.threadGoal?.status)
       ? state.threadGoal.status
       : null,
-    turnUsage: null,
+    turnUsage: sshTurnTiming(state, observedAt),
     unread:
       typeof state?.hasUnreadTurn === "boolean" ? state.hasUnreadTurn : null,
     runtime,
-    runtimeAt: conversation ? new Date().toISOString() : null,
+    runtimeAt: conversation ? observedAt : null,
     fresh: !!conversation,
     error:
       failed && conversation

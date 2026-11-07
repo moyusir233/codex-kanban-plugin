@@ -62,6 +62,7 @@ identities use `(hostId, threadId)`. Remote paths are never local paths.
 After snapshot loss, the UI retains only the previous title, cwd, project,
 and kind as non-live filter metadata for the same registered host/thread pair.
 Runtime, freshness, unread and pending-confirmation state are invalidated.
+Snapshot-derived turn timing is also cleared rather than cached as live metrics.
 This keeps project/title-filtered observation candidates eligible for recovery;
 a new live snapshot replaces the cached metadata.
 Observation candidates retain the local top-15 policy plus up to 50 registered
@@ -111,7 +112,13 @@ history. Approval payloads and controls require the separate explicit action
 opt-in above. Missing
 or malformed history is not proof that there are no questions. No waiting-start
 timestamp, user-message timestamp, usage or free-form assistant text is invented.
-Question/error display is cleared on snapshot loss.
+Question/error display is cleared on snapshot loss. Validated snapshot-only
+turn start timing is shown only for an active in-progress turn; explicit terminal
+duration is shown for completed/interrupted turns. Missing/invalid timing, newest
+history gaps and unbound placeholders remain unknown. Terminal duration never
+uses observation time or final-answer start as completion time. This does not
+fetch history or establish tokens, free-form input or user-message timestamps.
+Timing is cleared on disconnect/cache and restored by a new live snapshot only.
 
 SSH cards can join/create/edit the plugin's existing collections. Associations
 use canonical `ssh:["hostId","threadId"]` keys in the existing `threadIds` array;
@@ -138,7 +145,8 @@ collections should use this fork rather than an older installed package.
 | Open session | Existing local deep link | Host route established statically; disabled pending load/read compatibility checks |
 | Discovery | Existing local index/listing | No verified read-only Desktop SSH listing route |
 | Approvals/answers/execution | Existing local controls | Default denied; explicit per-pair opt-in uses current owner, fixture-tested only |
-| Usage/input timing/Git/artifacts/review/monitoring | Existing local behavior | Unavailable; no remote filesystem interpretation |
+| Turn timing | Existing local sources | Validated fields from received snapshot only; cleared on loss |
+| Tokens/input timestamps/Git/artifacts/review/monitoring | Existing local behavior | Unavailable; no remote filesystem interpretation |
 
 ## Source, repository distribution, and installed plugin
 
@@ -166,7 +174,7 @@ collections should use this fork rather than an older installed package.
 - Remote cards are excluded from local Git reads, artifacts and monitoring links.
   Default read-only registrations do not expose actionable approval payloads.
   Existing local operations stay unchanged.
-- No remote history fetching, last-user-message time, usage, Git or artifacts.
+- No remote history fetching, last-user-message time, token usage, Git or artifacts.
   Native waiting flags and recognized snapshot questions only; missing data
   does not prove the absence of questions.
 - Host IDs are caller-provided, not independently verified as SSH hosts.

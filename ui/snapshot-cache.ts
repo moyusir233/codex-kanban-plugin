@@ -18,7 +18,13 @@ export function cachedSnapshot(snapshot: Snapshot): Snapshot {
         ? { remoteActionsEnabled: false, observationOnly: true }
         : {}),
       ...(!isLocalSession(thread)
-        ? { runtime: null, runtimeAt: null, error: null, unread: null }
+        ? {
+            runtime: null,
+            runtimeAt: null,
+            error: null,
+            unread: null,
+            turnUsage: null,
+          }
         : {}),
       pendingUserInput: false,
       waitingQuestion: null,
@@ -82,6 +88,7 @@ export function reconcileSnapshot(
         runtimeAt: null,
         error: null,
         unread: null,
+        turnUsage: null,
         fresh: false,
         remoteActionsEnabled: false,
         observationOnly: true,
