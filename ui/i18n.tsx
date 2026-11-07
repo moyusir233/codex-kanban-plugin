@@ -23,6 +23,10 @@ const english: Record<string, string> = {
   "被 {title} 监听": "Monitored by {title}",
   "曾等待 {title}": "Waited for {title}",
   "曾被 {title} 等待": "Was waited on by {title}",
+  "会话 Git 元数据": "Thread Git metadata",
+  分支未知: "Branch unknown",
+  "Desktop 保存的会话 Git 元数据；不代表远程目录当前分支、HEAD 或 worktree。":
+    "Thread Git metadata stored by Desktop; not the remote directory's current branch, HEAD or worktree.",
   加入合集: "Add to collection",
   "打开合集：{title}": "Open collection: {title}",
   "将对话加入合集：{title}": "Add conversation to collection: {title}",

@@ -122,6 +122,16 @@ uses observation time or final-answer start as completion time. This does not
 fetch history or establish tokens, free-form input or user-message timestamps.
 Timing is cleared on disconnect/cache and restored by a new live snapshot only.
 
+If a loaded ordinary SSH snapshot includes recognized `gitInfo`, the card shows
+**Thread Git metadata**: a bounded branch string and full 40/64-hex commit ID.
+These are Desktop's saved thread metadata, **not** the remote directory's current
+branch/HEAD. A null/missing branch means unknown, never detached HEAD; worktree
+status is not inferred. `git` remains null and the existing local current-Git
+reader is unchanged. Origin URLs, credentials, paths and unknown fields are not
+returned. Malformed, unavailable, unloaded/subagent snapshots and disconnect/
+cache restoration clear this display; replacement metadata can restore it. No
+remote Git command, local path lookup or metadata update is performed.
+
 The board can display historical **successful wait relationships** from the
 latest received turn: recognized `codex_app.wait_threads` calls must have
 completed successfully, used a positive/default timeout, and explicitly returned
@@ -168,7 +178,8 @@ collections should use this fork rather than an older installed package.
 | Approvals/answers/execution | Existing local controls | Default denied; explicit per-pair opt-in uses current owner, fixture-tested only |
 | Turn timing | Existing local sources | Validated fields from received snapshot only; cleared on loss |
 | Wait relationships | Existing local monitoring | Successful latest-turn snapshot evidence between registered live SSH cards only; no active-watcher claim or navigation |
-| Tokens/input timestamps/Git/artifacts/review | Existing local behavior | Unavailable; no remote filesystem interpretation |
+| Saved thread Git metadata | Existing local behavior | Validated branch/commit fields from received snapshot; not current Git/worktree status |
+| Tokens/input timestamps/current Git/artifacts/review | Existing local behavior | Unavailable; no remote filesystem interpretation |
 
 ## Source, repository distribution, and installed plugin
 
@@ -196,7 +207,8 @@ collections should use this fork rather than an older installed package.
 - Remote cards are excluded from local Git reads, artifacts and navigation links.
   Default read-only registrations do not expose actionable approval payloads.
   Existing local operations stay unchanged.
-- No remote history fetching, last-user-message time, token usage, Git or artifacts.
+- No remote history fetching, last-user-message time, token usage, current Git
+  filesystem inspection or artifacts. Saved thread Git metadata is snapshot-only.
   Native waiting flags and recognized snapshot questions only; missing data
   does not prove the absence of questions.
 - Host IDs are caller-provided, not independently verified as SSH hosts.
@@ -220,6 +232,9 @@ collections should use this fork rather than an older installed package.
   boundaries, malformed/error results, private-output exclusion, bidirectional
   disconnect/replacement invalidation and disabled links in the actual source
   and distribution MCP/UI. No new live observation or session mutation was performed.
+  Git metadata fixtures cover unknown/malformed fields, excluded origin
+  credentials, same-ID host/cache isolation, branch-null replacement and missing
+  metadata, source/distribution rendering and filtered owner/transport recovery.
 - No session storage reads, security changes, host/plugin installation,
   website deployment, publication, merge, or upstream PR is needed.
 

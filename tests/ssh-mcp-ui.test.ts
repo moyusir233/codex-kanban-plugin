@@ -97,6 +97,7 @@ for (const { packaged, actions } of [
           {
             title: "Fixture local",
             cwd: home,
+            gitInfo: { branch: "fixture-local-snapshot-ignored" },
             threadRuntimeStatus: { type: "idle" },
           },
         ],
@@ -107,6 +108,12 @@ for (const { packaged, actions } of [
             cwd: "/REMOTE_NOT_LOCAL",
             threadRuntimeStatus: { type: "active", activeFlags: [] },
             latestCollaborationMode: { mode: "plan" },
+            gitInfo: {
+              branch: "fixture/recorded-ssh-branch",
+              sha: "a".repeat(40),
+              originUrl: "ssh://PRIVATE_ORIGIN_CREDENTIAL@fixture.invalid/repo",
+              isWorktree: true,
+            },
             turns: [
               {
                 turnId: "fixture-timing-turn",
@@ -456,12 +463,41 @@ for (const { packaged, actions } of [
         assert.ok(remoteCard().textContent?.includes("Plan mode"));
         assert.ok(remoteCard().textContent?.includes("Tokens unknown"));
         assert.ok(!remoteCard().textContent?.includes("Duration unknown"));
+        const snapshotGit = () =>
+          remoteCard().querySelector<HTMLElement>(".card-snapshot-git");
+        assert.ok(snapshotGit()?.textContent?.includes("Thread Git metadata"));
+        assert.ok(
+          snapshotGit()?.textContent?.includes("fixture/recorded-ssh-branch"),
+        );
+        assert.match(
+          snapshotGit()!.title,
+          /not the remote directory's current branch, HEAD or worktree/,
+        );
+        assert.doesNotMatch(
+          snapshotGit()!.textContent!,
+          /detached HEAD|worktree/,
+        );
+        assert.ok(
+          !window.document.body.textContent?.includes(
+            "PRIVATE_ORIGIN_CREDENTIAL",
+          ),
+        );
+        assert.ok(
+          !cards()
+            .find((card) => card.dataset.threadId === id)!
+            .querySelector(".card-snapshot-git"),
+        );
         const timingThread = snapshot.threads.find(
           (thread) => thread.id === id && thread.hostId === hostId,
         )!;
         assert.equal(timingThread.turnUsage?.id, "fixture-timing-turn");
         assert.equal(timingThread.turnUsage?.tokens, null);
         assert.equal(timingThread.lastUserMessageAt, null);
+        assert.equal(timingThread.git, null);
+        assert.deepEqual(timingThread.snapshotGit, {
+          branch: "fixture/recorded-ssh-branch",
+          sha: "a".repeat(40),
+        });
         assert.equal(
           remoteCard().querySelector<HTMLButtonElement>(".thread-card-open")
             ?.disabled,
@@ -487,6 +523,29 @@ for (const { packaged, actions } of [
           assert.ok(element, selector);
           element.click();
         };
+        // Received metadata replacement, including branch-null, cannot pretend
+        // to be current HEAD or execute a Git command against the remote cwd.
+        states.get(remoteKey).gitInfo = { branch: null, sha: "b".repeat(40) };
+        sendSnapshot(sockets.at(-1)!, id, hostId);
+        await until(
+          () => !!snapshotGit()?.textContent?.includes("Branch unknown"),
+        );
+        assert.ok(snapshotGit()!.textContent?.includes("b".repeat(40)));
+        assert.ok(!snapshotGit()!.textContent?.includes("detached HEAD"));
+        delete states.get(remoteKey).gitInfo;
+        sendSnapshot(sockets.at(-1)!, id, hostId);
+        await until(() => !snapshotGit());
+        states.get(remoteKey).gitInfo = {
+          branch: "fixture/restored-recorded-branch",
+          sha: null,
+        };
+        sendSnapshot(sockets.at(-1)!, id, hostId);
+        await until(
+          () =>
+            !!snapshotGit()?.textContent?.includes(
+              "fixture/restored-recorded-branch",
+            ),
+        );
         // A received successful wait displays exact cross-host graph edges, not
         // inferred target runtime or an active polling/navigation capability.
         const monitorCard = () =>
@@ -788,6 +847,13 @@ for (const { packaged, actions } of [
           false,
         );
         assert.deepEqual(disconnected.confirmations?.requests, []);
+        assert.equal(
+          disconnected.threads.find(
+            (thread) => sessionKey(thread) === remoteKey,
+          )?.snapshotGit,
+          null,
+        );
+        assert.equal(snapshotGit(), null);
         if (actions) {
           t.diagnostic("remote stale reply: submitting after owner loss");
           const before = messages.filter(
@@ -833,10 +899,16 @@ for (const { packaged, actions } of [
         t.diagnostic("remote stale reply: restoring snapshot");
         sendSnapshot(sockets.at(-1)!, id, hostId);
         await until(() => !!remoteCard()?.closest(".lane--green"));
+        assert.ok(
+          snapshotGit()?.textContent?.includes(
+            "fixture/restored-recorded-branch",
+          ),
+        );
         // Also exercise real transport disconnect/reconnect with held snapshots.
         respondToFollows = false;
         sockets.at(-1)!.destroy();
         await until(() => !!remoteCard()?.closest(".lane--muted"));
+        assert.equal(snapshotGit(), null);
         await until(() => sockets.length === 3);
         const reconnected = observations.length;
         await until(
@@ -847,6 +919,11 @@ for (const { packaged, actions } of [
         respondToFollows = true;
         sendSnapshot(sockets.at(-1)!, id, hostId);
         await until(() => !!remoteCard()?.closest(".lane--green"));
+        assert.ok(
+          snapshotGit()?.textContent?.includes(
+            "fixture/restored-recorded-branch",
+          ),
+        );
         assert.equal(cards().length, 1);
         assert.equal(
           remoteCard().querySelector<HTMLButtonElement>(".thread-card-open")

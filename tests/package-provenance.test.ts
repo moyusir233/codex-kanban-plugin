@@ -30,6 +30,11 @@ test("fork distribution has matching source UI, launch config and content-addres
   assert.match(ui.toString(), /auto-answer pending questions/);
   assert.match(ui.toString(), /Waited for/);
   assert.match(ui.toString(), /Was waited on by/);
+  assert.match(ui.toString(), /Thread Git metadata/);
+  assert.match(
+    ui.toString(),
+    /not the remote directory's current branch, HEAD or worktree/,
+  );
   assert.deepEqual(
     await readFile(join(root, "scripts/start-mcp.sh")),
     await readFile("scripts/start-mcp.sh"),
@@ -46,6 +51,7 @@ test("fork distribution has matching source UI, launch config and content-addres
   assert.match(server.toString(), /TASKBOARD_SSH_ACTIONS/);
   assert.match(server.toString(), /function withSshMonitoring/);
   assert.match(server.toString(), /function sshSnapshotTurn/);
+  assert.match(server.toString(), /function sshSnapshotGitInfo/);
   assert.match(server.toString(), /Number\.isSafeInteger\(key\d*\)/);
   const pkg = JSON.parse(await readFile(join(root, "package.json"), "utf8"));
   assert.equal(

@@ -28,6 +28,8 @@ export type TurnUsage = {
 export type ThreadLink = { id: string; hostId?: string; title: string };
 /** 工作目录当前的 Git 状态；无分支名表示 detached HEAD。 */
 export type GitMetadata = { branch: string | null; isWorktree: boolean };
+/** Desktop 保存的会话 Git 元数据，不代表工作目录当前 HEAD 或 worktree。 */
+export type SnapshotGitInfo = { branch: string | null; sha: string | null };
 export type Thread = {
   id: string;
   /** Omitted for legacy local sessions; remote IDs are scoped to this host. */
@@ -41,6 +43,8 @@ export type Thread = {
   project: string;
   /** 按实际工作目录读取；非仓库或无法读取时为 null。 */
   git?: GitMetadata | null;
+  /** SSH 快照来源；不包含仓库地址、路径或可执行/导航能力。 */
+  snapshotGit?: SnapshotGitInfo | null;
   updatedAt: string;
   /** 最近一次用户发消息的时间；不会随助手输出或自动续跑更新。 */
   lastUserMessageAt: string | null;

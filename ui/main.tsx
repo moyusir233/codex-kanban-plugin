@@ -1196,6 +1196,21 @@ function ThreadCard({
                 <span>{branchLabel}</span>
               </span>
             )}
+            {!local && thread.fresh && thread.snapshotGit && (
+              <span
+                className="card-branch card-snapshot-git"
+                title={t(
+                  "Desktop 保存的会话 Git 元数据；不代表远程目录当前分支、HEAD 或 worktree。",
+                )}
+              >
+                <GitBranch size={12} aria-hidden="true" />
+                <span>
+                  {t("会话 Git 元数据")} ·{" "}
+                  {thread.snapshotGit.branch ?? t("分支未知")}
+                  {thread.snapshotGit.sha && ` · ${thread.snapshotGit.sha}`}
+                </span>
+              </span>
+            )}
           </span>
           {thread.unread === true && (
             <span

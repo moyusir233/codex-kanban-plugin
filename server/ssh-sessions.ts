@@ -3,6 +3,7 @@ import { sessionKey, type SessionTarget } from "../shared/session-identity.js";
 import type { Thread } from "../shared/types.js";
 import type { DesktopConversation } from "./desktop-ipc.js";
 import { sshTurnTiming } from "./ssh-turn-timing.js";
+import { sshSnapshotGitInfo } from "./ssh-git-info.js";
 import {
   desktopInputState,
   desktopTurns,
@@ -124,6 +125,12 @@ export function sshSessionThread(
     cwd,
     project: `${target.hostId} · ${cwd || "Remote project unknown"}`,
     git: null,
+    snapshotGit:
+      conversation &&
+      !state?.source?.subAgent &&
+      ["active", "idle"].includes(runtime?.type ?? "")
+        ? sshSnapshotGitInfo(state?.gitInfo)
+        : null,
     updatedAt:
       timestamp && !Number.isNaN(timestamp.getTime())
         ? timestamp.toISOString()

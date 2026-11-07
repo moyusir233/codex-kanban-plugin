@@ -52680,6 +52680,19 @@ function sshTurnTiming(state, observedAt) {
   }
 }
 
+// server/ssh-git-info.ts
+var sshGitInfoSchema = external_exports.object({
+  branch: external_exports.string().min(1).max(1024).regex(/^[^\u0000-\u001f\u007f-\u009f\u2028\u2029]+$/u).nullable().optional(),
+  sha: external_exports.string().regex(/^(?:[0-9a-f]{40}|[0-9a-f]{64})$/i).nullable().optional()
+});
+function sshSnapshotGitInfo(value) {
+  const parsed = sshGitInfoSchema.safeParse(value);
+  if (!parsed.success) return null;
+  const branch = parsed.data.branch ?? null;
+  const sha = parsed.data.sha ?? null;
+  return branch || sha ? { branch, sha } : null;
+}
+
 // server/ssh-sessions.ts
 var targets = external_exports.array(
   external_exports.object({
@@ -52754,6 +52767,7 @@ function sshSessionThread(target, conversation) {
     cwd,
     project: `${target.hostId} \xB7 ${cwd || "Remote project unknown"}`,
     git: null,
+    snapshotGit: conversation && !state?.source?.subAgent && ["active", "idle"].includes(runtime?.type ?? "") ? sshSnapshotGitInfo(state?.gitInfo) : null,
     updatedAt: timestamp2 && !Number.isNaN(timestamp2.getTime()) ? timestamp2.toISOString() : "",
     lastUserMessageAt: null,
     kind: state?.source?.subAgent ? "agent" : "user",

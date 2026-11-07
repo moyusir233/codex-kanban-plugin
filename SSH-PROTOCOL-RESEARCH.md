@@ -125,6 +125,35 @@ needs an explicitly exported read-only, host-scoped catalog channel or authorize
 executor integration that does not borrow a business/test session's identity.
 No discovery probe or installed app-tools enablement was performed.
 
+### Existing control-socket transport candidate (not attached)
+
+The public [app-server protocol documentation](https://learn.chatgpt.com/docs/app-server#protocol)
+describes WebSocket over a Unix control socket. In the public Desktop bundle,
+bootstrap854's `createSshProxyStream` runs `codex app-server proxy` under SSH and
+uses its byte stream for the existing remote app-server. This is distinct from
+`startRemoteAppServer`, which can start a backend and perform remote setup; that
+bootstrap path is not an observation operation and is not replicated here.
+
+Pinned open-source commit `57a808a3920f05f2d4b9eab2d0493e1df136ae6b` provides
+[`cli/src/main.rs`](https://github.com/openai/codex/blob/57a808a3920f05f2d4b9eab2d0493e1df136ae6b/codex-rs/cli/src/main.rs)
+(Git blob `a1462ee2a36535fba971389bf8ef8bda8ad9b8d5`): the Proxy branch resolves
+an explicit/default control-socket path and calls `codex_stdio_to_uds::run`,
+separately from daemon Start/Bootstrap.
+[`stdio-to-uds/src/lib.rs`](https://github.com/openai/codex/blob/57a808a3920f05f2d4b9eab2d0493e1df136ae6b/codex-rs/stdio-to-uds/src/lib.rs)
+(Git blob `a103de3312a04d087f81e5e49c7b2c05e3f4d208`) connects an existing Unix
+socket and relays bytes; it does not bootstrap a backend or issue JSON-RPC on its
+own. This supplies a real reusable-backend building block, not a demonstration
+that an external plugin can access the user's installed Desktop connection.
+
+A safe full-feature implementation would still need an explicitly exported
+authorized transport to the **same** Desktop-owned host backend, installed
+version/handshake verification, precise read/subscription vs action admission,
+and connection/owner lifecycle tests. A second SSH command is not reuse of
+Desktop's existing SSH transport. No socket/credential discovery, control-socket
+connection, daemon start, SSH command, config change or native attach is added.
+Absent a verified Desktop export, this remains a transport candidate rather
+than a fabricated automatic-discovery or parity implementation.
+
 ### Ordinary MCP App host scope is not a global Desktop tool bridge
 
 Renderer63396 `nI` receives a fixed server (`tu`), host (`M`) and conversation
@@ -187,6 +216,37 @@ Remote links have no href and cannot call the host. Local readers/references and
 navigation are unchanged. No wait, read, resume, execution or live observation
 was performed to implement or test this graph; fixtures cover source and
 repository-distribution MCP/UI.
+
+## Saved thread Git metadata is not live checkout status
+
+bootstrap854's `w1` maps the app-server thread's `gitInfo` into conversation
+state. The thread store applies it on stored-thread reads and resume/rollback
+responses; `getGitInfo` may fill a missing repository origin during
+initialization. The stream factory's `w = e => Object.fromEntries(Object.entries(e))`
+serializer preserves conversation properties for `sendSnapshot`, so this field
+can arrive through the already used v11 snapshot transport. This establishes
+its source, not freshness of the remote working directory's HEAD. No read,
+resume or rollback was invoked to obtain it.
+
+The public app-server documentation calls `thread/metadata/update` a stored Git
+metadata update, not a current Git inspection API. At pinned open-source commit
+`57a808a3920f05f2d4b9eab2d0493e1df136ae6b`,
+[`thread_data.rs`](https://github.com/openai/codex/blob/57a808a3920f05f2d4b9eab2d0493e1df136ae6b/codex-rs/app-server-protocol/src/protocol/v2/thread_data.rs)
+declares nullable `sha`, `branch` and `origin_url` with camelCase serialization
+(Git blob `dd7c0d854a62f34d60c130154f86570bf1770e0f`). This corroborates the
+shape but is not an installed-version guarantee.
+
+The fork exposes only a separately named `snapshotGit` branch/commit summary on
+loaded ordinary SSH cards. The branch is bounded and rejects control characters;
+commit IDs must be complete 40/64-hex values. Missing or malformed data stays
+unknown. Origin URLs and all extra fields are omitted, so private credentials/
+remote paths cannot reach the board through this summary. Null branch is not
+interpreted as detached HEAD, no worktree status is fabricated, and the local
+`git` field/reader are unchanged. The UI explicitly distinguishes stored thread
+metadata from current branch, HEAD or worktree; disconnect, unloaded state and
+cache restoration clear it. Fixtures cover replacement/loss, same-ID host
+isolation and source/distribution UI. This does not implement remote current Git
+status, artifact fetching or review.
 
 ## Snapshot-only turn timing
 
@@ -293,11 +353,12 @@ Reuse the Desktop-owned host services, not a competing backend:
 - **Already implemented:** explicit observation, non-live filtering metadata
   retention, host-safe collections and local filesystem exclusion. Snapshot-only
   validated turn timing and historical successful wait relationships now
-  supplement these without loading history.
+  supplement these without loading history. Saved thread Git metadata is also
+  displayed separately from live checkout state, without filesystem access.
 - **Unfinished:** supported catalog/host discovery export, installed-version
   and authorized live acceptance, a navigation route with acceptable verified
   effects (known hydration/read/auto-response risks now documented), usage/input
-  timestamps, host-routed Git/artifacts/review and complete cross-host monitoring.
+  timestamps, host-routed current Git/artifacts/review and complete cross-host monitoring.
   **Full parity is not established or implemented by this commit.**
 
 Remote operations have not been tested live. Separate explicit authorization for
