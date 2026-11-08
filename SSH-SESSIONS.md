@@ -2,6 +2,10 @@
 
 Base: `51a96afdbdd8d427c02bb03c4a0cabacc6ac0e25`.
 
+Installed-environment verification and the current acceptance boundary are
+tracked in [SSH-DESKTOP-ACCEPTANCE.md](https://github.com/moyusir233/codex-kanban-plugin/blob/feat/ssh-session-observer/SSH-DESKTOP-ACCEPTANCE.md). A successful
+remote CLI seed is test setup, not Desktop IPC or full-parity acceptance.
+
 ## Discovery evidence and limits
 
 - The supplied bounded observation of `my-dev-box` thread
@@ -45,10 +49,12 @@ Base: `51a96afdbdd8d427c02bb03c4a0cabacc6ac0e25`.
 Set this variable for the fork server process on the same machine as Desktop:
 
 ```sh
-TASKBOARD_SSH_SESSIONS='[{"hostId":"my-dev-box","threadId":"01a1b141-997b-79f3-8974-417f64be1d25"}]'
+TASKBOARD_SSH_SESSIONS='[{"hostId":"ssh-example-host","threadId":"a0000000-0000-4000-8000-000000000001"}]'
 ```
 
-Supply exact desktop host IDs and existing UUIDs yourself. This is a process
+The example is synthetic; replace it only with a newly designated disposable
+pair for acceptance. The historical thread in the evidence above is excluded
+from new live testing. Supply exact Desktop host IDs and existing UUIDs yourself. This is a process
 environment variable, not a persisted desktop or installed plugin change.
 It defaults to no remote targets; maximum 50 pairs; malformed input fails
 startup. The example configures a target, not authorization for live testing.

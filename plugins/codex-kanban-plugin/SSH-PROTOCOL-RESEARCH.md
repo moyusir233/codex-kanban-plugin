@@ -1,5 +1,12 @@
 # Desktop SSH parity research — 2026-11-07
 
+**Installed-environment follow-up (2026-11-08):** the actual macOS Desktop
+26.1103.41825 / 25679 ASAR matches the SHA256 below. Earlier statements about
+the absent Desktop describe the original research environment. See
+[Desktop acceptance preparation](https://github.com/moyusir233/codex-kanban-plugin/blob/feat/ssh-session-observer/SSH-DESKTOP-ACCEPTANCE.md) for the verified
+versions, disposable-session setup and still-unfinished integration/live gates.
+This match does not establish a new ordinary-plugin host-service export.
+
 ## Scope and provenance
 
 Static analysis only: no installed application, session storage or live session
