@@ -1,0 +1,66 @@
+.ssh-directory {
+  border-block: 1px solid var(--line);
+  padding: 12px 0;
+  margin: 12px 0;
+}
+.ssh-directory p {
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+}
+.ssh-directory-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+.ssh-directory-controls label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  font-size: 12px;
+}
+.ssh-directory-controls select {
+  max-width: 100%;
+  min-width: 0;
+  color: var(--ink);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+}
+.ssh-directory-controls button {
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 5px 8px;
+  font-size: 12px;
+}
+.ssh-directory-rows {
+  list-style: none;
+  margin: 12px 0;
+  padding: 0;
+  display: grid;
+  gap: 8px;
+}
+.ssh-directory-rows li {
+  display: grid;
+  gap: 4px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 10px;
+  overflow-wrap: anywhere;
+}
+.ssh-directory-rows strong {
+  font-size: 13px;
+}
+.ssh-directory-rows code,
+.ssh-directory-rows small {
+  font-size: 11px;
+  color: var(--muted);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.ssh-directory [role="alert"] {
+  color: var(--red);
+}

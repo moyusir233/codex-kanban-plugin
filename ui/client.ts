@@ -16,6 +16,10 @@ import type {
 import type { WorkReview, WorkReviewOptions } from "../shared/work-review";
 import { cachedSnapshot } from "./snapshot-cache";
 import { isLocalSession } from "../shared/session-identity";
+import type {
+  DesktopCatalogCursor,
+  DesktopCatalogPage,
+} from "../shared/desktop-catalog";
 
 let app: App | null = null;
 let extensions: OpenAIExtensions | null = null;
@@ -51,7 +55,10 @@ export function connect(): Promise<void> {
           `${insets[edge] ?? 0}px`,
         );
   };
-  app.addEventListener("hostcontextchanged", theme);
+  app.addEventListener("hostcontextchanged", () => {
+    theme();
+    window.dispatchEvent?.(new Event("taskboard:host-context-changed"));
+  });
   return (ready = app.connect().then(theme));
 }
 export function validSnapshot(value: unknown): value is Snapshot {
@@ -114,6 +121,48 @@ export async function readSnapshot(
 }
 export const SSH_NAVIGATION_DISABLED =
   "SSH navigation is disabled. Desktop may resume the session, change ownership/read state, or auto-answer pending questions. Open in Codex Desktop only if you intend those effects.";
+
+export async function readDesktopCatalog(
+  hostId: string,
+  limit: number,
+  cursor?: DesktopCatalogCursor,
+  signal?: AbortSignal,
+): Promise<DesktopCatalogPage> {
+  await connect();
+  if (!app)
+    throw new Error(
+      "SSH 目录需要真实 Desktop 执行器上下文；预览不支持该读取。",
+    );
+  signal?.throwIfAborted();
+  const result = await app.callServerTool(
+    {
+      name: "taskboard_desktop_catalog",
+      arguments: { hostId, limit, ...(cursor ? { cursor } : {}) },
+    },
+    { signal },
+  );
+  if (result.isError) {
+    const message = result.content?.find((item) => item.type === "text");
+    throw new Error(
+      message && "text" in message
+        ? String(message.text)
+        : "SSH directory unavailable. No automatic retry.",
+    );
+  }
+  const page = result.structuredContent as DesktopCatalogPage | undefined;
+  if (
+    !page ||
+    page.source !== "desktop-native:list_threads/history" ||
+    page.hostId !== hostId ||
+    page.runtimeFreshness !== "not-established" ||
+    !Array.isArray(page.sessions) ||
+    page.sessions.length > limit ||
+    page.sessions.some((session) => session.hostId !== hostId) ||
+    (page.nextCursor && page.nextCursor.hostId !== hostId)
+  )
+    throw new Error("SSH directory returned an unverified host/page.");
+  return page;
+}
 
 /** Explicit remote routing in manual links is subject to the same deny gate. */
 export function isSshNavigationLink(url: string): boolean {

@@ -8,6 +8,7 @@ export function cachedSnapshot(snapshot: Snapshot): Snapshot {
   return {
     ...snapshot,
     cached: true,
+    sources: { ...snapshot.sources, desktopCatalog: undefined },
     threads: snapshot.threads.map((thread) => ({
       ...thread,
       cachedColumn: isLocalSession(thread)

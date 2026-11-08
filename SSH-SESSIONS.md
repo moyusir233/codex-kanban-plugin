@@ -6,6 +6,20 @@ Installed-environment verification and the current acceptance boundary are
 tracked in [SSH-DESKTOP-ACCEPTANCE.md](https://github.com/moyusir233/codex-kanban-plugin/blob/feat/ssh-session-observer/SSH-DESKTOP-ACCEPTANCE.md). A successful
 remote CLI seed is test setup, not Desktop IPC or full-parity acceptance.
 
+The authorized follow-up subsequently opened only the new disposable SSH pair
+and verified actual v11 snapshots through the source and distribution MCP
+processes. Basic observation of that one Desktop-loaded pair now has live
+evidence; approvals, automatic discovery and the remaining parity cells do not.
+The separately authorized ordinary-plugin experiment also verified a narrow
+native host-directory route. The fork now offers an off-by-default **configured
+host directory** via `TASKBOARD_DESKTOP_CATALOG` and `taskboard_desktop_catalog`.
+See [scope, expiry, runtime and budget configuration](https://github.com/moyusir233/codex-kanban-plugin/blob/feat/ssh-session-observer/SSH-HOST-CATALOG.md).
+This does not discover connected hosts automatically, classify ordinary/subagent
+records, add observations, open sessions or confer remote action capabilities.
+Native `read_thread`/`wait_threads` remain excluded because their failure paths
+can read other hosts. The normal-board directory UI is fixture-tested, not yet
+live-installed/accepted. Full SSH parity remains unfinished.
+
 ## Discovery evidence and limits
 
 - The supplied bounded observation of `my-dev-box` thread
@@ -187,7 +201,7 @@ collections should use this fork rather than an older installed package.
 | Question/failure display | Existing Desktop/history parsing | Known shape from received snapshot only; read-only |
 | Collections | Existing plugin-owned records | Host-scoped association, picker, tags and search |
 | Open session | Existing local deep link | Disabled: known resume/ownership/read/auto-response risks; installed compatibility unverified |
-| Discovery | Existing local index/listing | No verified read-only Desktop SSH listing route |
+| Discovery | Existing local index/listing | Optional expiring configured-host history directory via verified native route; no automatic connected-host discovery or automatic snapshot registration |
 | Approvals/answers/execution | Existing local controls | Default denied; explicit per-pair opt-in uses current owner, fixture-tested only |
 | Turn timing | Existing local sources | Validated fields from received snapshot only; cleared on loss |
 | Wait relationships | Existing local monitoring | Successful latest-turn snapshot evidence between registered live SSH cards only; no active-watcher claim or navigation |

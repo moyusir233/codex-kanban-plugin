@@ -24,8 +24,8 @@ test("fork distribution has matching source UI, launch config and content-addres
   assert.deepEqual(config.env_vars, sourceConfig.env_vars);
   assert.ok(config.env_vars.includes("TASKBOARD_SSH_SESSIONS"));
   assert.ok(config.env_vars.includes("TASKBOARD_SSH_ACTIONS"));
-  // Native Desktop services need a verified export, not inherited pipe/caller
-  // identities or a peer-authorization switch in an ordinary plugin config.
+  // Only the verified transport/runtime plus an explicit policy may be staged.
+  // Startup removes transport fields unless opted in; caller/trust switches never forward.
   for (const definition of [sourceConfig, config]) {
     assert.deepEqual(definition.env_vars, [
       "HOME",
@@ -34,6 +34,9 @@ test("fork distribution has matching source UI, launch config and content-addres
       "TASKBOARD_WS_URL",
       "TASKBOARD_SSH_SESSIONS",
       "TASKBOARD_SSH_ACTIONS",
+      "TASKBOARD_DESKTOP_CATALOG",
+      "CODEX_APP_TOOLS_PIPE_PATH",
+      "CODEX_MCP_NODE_PATH",
     ]);
     for (const key of [
       "CODEX_APP_TOOLS_PIPE_PATH",

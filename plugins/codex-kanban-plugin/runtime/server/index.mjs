@@ -7,7 +7,7 @@ var __export = (target, all) => {
 
 // server/index.ts
 import { readFileSync } from "node:fs";
-import { createHash as createHash4 } from "node:crypto";
+import { createHash as createHash6 } from "node:crypto";
 import { fileURLToPath as fileURLToPath3 } from "node:url";
 
 // node_modules/@modelcontextprotocol/server/dist/chunk-vYduTEsO.mjs
@@ -1555,12 +1555,12 @@ function $constructor(name, initializer5, proto, params) {
     inst._zod.traits.add(name);
     initializer5(inst, def);
     if (initialized) {
-      const own2 = Object.getPrototypeOf(inst);
+      const own3 = Object.getPrototypeOf(inst);
       const ctorProto = inst._zod.constr.prototype;
-      let up = own2;
+      let up = own3;
       while (up && up !== ctorProto)
         up = Object.getPrototypeOf(up);
-      const target = up ?? own2;
+      const target = up ?? own3;
       if (!initialized.has(target)) {
         initialized.add(target);
         members(target, protoMembers);
@@ -4918,20 +4918,20 @@ function leafPattern(schema) {
     return "(?!)";
   if (minimum !== void 0 || maximum !== void 0)
     return string({ minimum, maximum }).source;
-  const own2 = schema._zod.pattern;
-  return (isInt && own2 === number ? integer : own2)?.source;
+  const own3 = schema._zod.pattern;
+  return (isInt && own3 === number ? integer : own3)?.source;
 }
 function partPattern(schema) {
   const def = schema._zod.def;
-  const own2 = schema._zod.pattern?.source;
+  const own3 = schema._zod.pattern?.source;
   const inner = def.innerType ?? schema._zod.innerType;
   if (inner) {
     const before = inner._zod.pattern?.source;
     const after = partPattern(inner);
-    if (own2 && before && after && after !== before) {
-      return own2.replace(cleanRegex(before), () => cleanRegex(after));
+    if (own3 && before && after && after !== before) {
+      return own3.replace(cleanRegex(before), () => cleanRegex(after));
     }
-    return own2;
+    return own3;
   }
   if (def.options) {
     const sources = def.options.map(partPattern);
@@ -16720,8 +16720,8 @@ function rewriteKeyNames(ctx) {
       bySchema.set(entry.schema, entry);
   }
   const rewrites = /* @__PURE__ */ new Map();
-  for (const record3 of pendingRecords.get(ctx) ?? []) {
-    const seen = ctx.seen.get(record3);
+  for (const record4 of pendingRecords.get(ctx) ?? []) {
+    const seen = ctx.seen.get(record4);
     const names = (seen?.def ?? seen?.schema)?.propertyNames;
     if (!names || names === true || rewrites.has(names))
       continue;
@@ -28184,14 +28184,14 @@ var require_utils = /* @__PURE__ */ __commonJSMin(((exports, module) => {
     for (let i = left.length; i < parts.length; i++) expanded.push(parts[i]);
     return compressIPv6ZeroRun(expanded);
   }
-  function normalizeIPv6(host) {
-    const bracketed = host[0] === "[" && host[host.length - 1] === "]";
-    if ((host[0] === "[" || host[host.length - 1] === "]") && !bracketed) return {
-      host,
+  function normalizeIPv6(host2) {
+    const bracketed = host2[0] === "[" && host2[host2.length - 1] === "]";
+    if ((host2[0] === "[" || host2[host2.length - 1] === "]") && !bracketed) return {
+      host: host2,
       isIPV6: false,
       error: true
     };
-    let input2 = bracketed ? host.slice(1, -1) : host;
+    let input2 = bracketed ? host2.slice(1, -1) : host2;
     if (bracketed && isIPvFuture(input2)) {
       input2 = input2.toLowerCase();
       return {
@@ -28202,7 +28202,7 @@ var require_utils = /* @__PURE__ */ __commonJSMin(((exports, module) => {
       };
     }
     if (findToken(input2, ":") < 2) return {
-      host,
+      host: host2,
       isIPV6: false,
       error: bracketed
     };
@@ -28212,7 +28212,7 @@ var require_utils = /* @__PURE__ */ __commonJSMin(((exports, module) => {
       const separatorLength = input2.slice(zoneSeparator, zoneSeparator + 3).toLowerCase() === "%25" ? 3 : 1;
       zoneIdentifier = input2.slice(zoneSeparator + separatorLength);
       if (!isZoneIdentifier(zoneIdentifier)) return {
-        host,
+        host: host2,
         isIPV6: false,
         error: true
       };
@@ -28220,7 +28220,7 @@ var require_utils = /* @__PURE__ */ __commonJSMin(((exports, module) => {
     }
     const address = normalizeIPv6Address(input2);
     if (address === void 0) return {
-      host,
+      host: host2,
       isIPV6: false,
       error: true
     };
@@ -28312,10 +28312,10 @@ var require_utils = /* @__PURE__ */ __commonJSMin(((exports, module) => {
   };
   const HOST_DELIM_RE = /[@/?#:]/g;
   const HOST_DELIM_NO_COLON_RE = /[@/?#]/g;
-  function reescapeHostDelimiters(host, isIP) {
+  function reescapeHostDelimiters(host2, isIP) {
     const re = isIP ? HOST_DELIM_NO_COLON_RE : HOST_DELIM_RE;
     re.lastIndex = 0;
-    return host.replace(re, (ch) => HOST_DELIMS[ch]);
+    return host2.replace(re, (ch) => HOST_DELIMS[ch]);
   }
   function normalizePercentEncoding(input2, decodeUnreserved = false) {
     if (input2.indexOf("%") === -1) return input2;
@@ -28490,17 +28490,17 @@ var require_utils = /* @__PURE__ */ __commonJSMin(((exports, module) => {
       uriTokens.push("@");
     }
     if (component.host !== void 0) {
-      let host = component.host;
-      if (!isIPv4(host)) {
-        let ipV6res = normalizeIPv6(host);
+      let host2 = component.host;
+      if (!isIPv4(host2)) {
+        let ipV6res = normalizeIPv6(host2);
         if (ipV6res.isIPV6 !== true && ipV6res.isIPVFuture !== true) {
-          host = normalizePercentEncoding(host, true);
-          ipV6res = normalizeIPv6(host);
+          host2 = normalizePercentEncoding(host2, true);
+          ipV6res = normalizeIPv6(host2);
         }
-        if (ipV6res.isIPV6 === true || ipV6res.isIPVFuture === true) host = `[${ipV6res.escapedHost}]`;
-        else host = reescapeHostDelimiters(host, false);
+        if (ipV6res.isIPV6 === true || ipV6res.isIPVFuture === true) host2 = `[${ipV6res.escapedHost}]`;
+        else host2 = reescapeHostDelimiters(host2, false);
       }
-      uriTokens.push(host);
+      uriTokens.push(host2);
     }
     if (typeof component.port === "number" || typeof component.port === "string") {
       const port = String(component.port);
@@ -28820,12 +28820,12 @@ var require_fast_uri = /* @__PURE__ */ __commonJSMin(((exports, module) => {
     }
     return false;
   }
-  function isIPLiteral(host) {
-    return host[0] === "[" && host[host.length - 1] === "]";
+  function isIPLiteral(host2) {
+    return host2[0] === "[" && host2[host2.length - 1] === "]";
   }
   function hasMalformedComponentPercentEncoding(matches) {
-    const host = matches[4];
-    return hasMalformedPercentEncoding(matches[3]) || host !== void 0 && !isIPLiteral(host) && hasMalformedPercentEncoding(host) || hasMalformedPercentEncoding(matches[6]) || hasMalformedPercentEncoding(matches[7]) || hasMalformedPercentEncoding(matches[8]);
+    const host2 = matches[4];
+    return hasMalformedPercentEncoding(matches[3]) || host2 !== void 0 && !isIPLiteral(host2) && hasMalformedPercentEncoding(host2) || hasMalformedPercentEncoding(matches[6]) || hasMalformedPercentEncoding(matches[7]) || hasMalformedPercentEncoding(matches[8]);
   }
   function canonicalizeHost(parsed, options, schemeHandler, isIP) {
     if (!options.unicodeSupport && (!schemeHandler || !schemeHandler.unicodeSupport) && parsed.host && !isIPLiteral(parsed.host) && (options.domainHost || schemeHandler && schemeHandler.domainHost) && isIP === false && nonSimpleDomain(parsed.host)) try {
@@ -28920,9 +28920,9 @@ var require_fast_uri = /* @__PURE__ */ __commonJSMin(((exports, module) => {
       const schemeHandler = getSchemeHandler(options.scheme || parsed.scheme);
       if (!malformedIPLiteral) malformedHost = canonicalizeHost(parsed, options, schemeHandler, isIP);
       if (uri3.indexOf("%") !== -1 && parsed.host !== void 0 && !malformedIPLiteral) {
-        let host = isIP ? parsed.host : normalizePercentEncoding(parsed.host, true);
-        if (!isIP) host = normalizePercentEncoding(host.toLowerCase());
-        parsed.host = reescapeHostDelimiters(host, isIP);
+        let host2 = isIP ? parsed.host : normalizePercentEncoding(parsed.host, true);
+        if (!isIP) host2 = normalizePercentEncoding(host2.toLowerCase());
+        parsed.host = reescapeHostDelimiters(host2, isIP);
       }
       if (!schemeHandler || schemeHandler && !schemeHandler.skipNormalize) {
         if (parsed.path) parsed.path = normalizePathEncoding(parsed.path);
@@ -33152,9 +33152,9 @@ var Server = class extends Protocol {
   _clientCapabilities;
   _clientVersion;
   static {
-    writeClientIdentity = (server, identity) => {
-      if (identity.clientCapabilities !== void 0) server._clientCapabilities = identity.clientCapabilities;
-      if (identity.clientInfo !== void 0) server._clientVersion = identity.clientInfo;
+    writeClientIdentity = (server, identity2) => {
+      if (identity2.clientCapabilities !== void 0) server._clientCapabilities = identity2.clientCapabilities;
+      if (identity2.clientInfo !== void 0) server._clientVersion = identity2.clientInfo;
     };
     installDiscoverHandler = (server, servedModernVersions) => {
       const missing = servedModernVersions.filter((version3) => !server._supportedProtocolVersions.includes(version3));
@@ -34022,7 +34022,7 @@ var McpServer = class {
     this.server.assertCanSetRequestHandler("resources/read");
     this.server.registerCapabilities({ resources: { listChanged: this.server.getCapabilities().resources?.listChanged ?? true } });
     this.server.setRequestHandler("resources/list", async (_request, ctx) => {
-      const resources = Object.entries(this._registeredResources).filter(([_, resource]) => resource.enabled).map(([uri3, resource]) => ({
+      const resources2 = Object.entries(this._registeredResources).filter(([_, resource]) => resource.enabled).map(([uri3, resource]) => ({
         uri: uri3,
         name: resource.name,
         ...resource.metadata
@@ -34036,7 +34036,7 @@ var McpServer = class {
           ...resource
         });
       }
-      return { resources: [...resources, ...templateResources] };
+      return { resources: [...resources2, ...templateResources] };
     });
     this.server.setRequestHandler("resources/templates/list", async () => {
       return { resourceTemplates: Object.entries(this._registeredResourceTemplates).map(([name, template]) => ({
@@ -50001,14 +50001,14 @@ var RELATIVE_JSON_POINTER = /^(?:0|[1-9][0-9]*)(?:#|(?:\/(?:[^~/]|~0|~1)*)*)$/;
 var EMAIL = (input2) => {
   if (input2[0] === '"')
     return false;
-  const [name, host, ...rest] = input2.split("@");
-  if (!name || !host || rest.length !== 0 || name.length > 64 || host.length > 253)
+  const [name, host2, ...rest] = input2.split("@");
+  if (!name || !host2 || rest.length !== 0 || name.length > 64 || host2.length > 253)
     return false;
   if (name[0] === "." || name.endsWith(".") || name.includes(".."))
     return false;
-  if (!/^[a-z0-9.-]+$/i.test(host) || !/^[a-z0-9.!#$%&'*+/=?^_`{|}~-]+$/i.test(name))
+  if (!/^[a-z0-9.-]+$/i.test(host2) || !/^[a-z0-9.!#$%&'*+/=?^_`{|}~-]+$/i.test(name))
     return false;
-  return host.split(".").every((part) => /^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?$/i.test(part));
+  return host2.split(".").every((part) => /^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?$/i.test(part));
 };
 var IPV4 = /^(?:(?:25[0-5]|2[0-4]\d|[01]?\d\d?)\.){3}(?:25[0-5]|2[0-4]\d|[01]?\d\d?)$/;
 var IPV6 = /^((([0-9a-f]{1,4}:){7}([0-9a-f]{1,4}|:))|(([0-9a-f]{1,4}:){6}(:[0-9a-f]{1,4}|((25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)(\.(25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)){3})|:))|(([0-9a-f]{1,4}:){5}(((:[0-9a-f]{1,4}){1,2})|:((25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)(\.(25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)){3})|:))|(([0-9a-f]{1,4}:){4}(((:[0-9a-f]{1,4}){1,3})|((:[0-9a-f]{1,4})?:((25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)(\.(25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)){3}))|:))|(([0-9a-f]{1,4}:){3}(((:[0-9a-f]{1,4}){1,4})|((:[0-9a-f]{1,4}){0,2}:((25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)(\.(25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)){3}))|:))|(([0-9a-f]{1,4}:){2}(((:[0-9a-f]{1,4}){1,5})|((:[0-9a-f]{1,4}){0,3}:((25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)(\.(25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)){3}))|:))|(([0-9a-f]{1,4}:){1}(((:[0-9a-f]{1,4}){1,6})|((:[0-9a-f]{1,4}){0,4}:((25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)(\.(25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)){3}))|:))|(:(((:[0-9a-f]{1,4}){1,7})|((:[0-9a-f]{1,4}){0,5}:((25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)(\.(25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)){3}))|:)))$/i;
@@ -51211,11 +51211,11 @@ function event(line) {
   ))
     return null;
   try {
-    const record3 = JSON.parse(line);
-    const p = record3.payload;
-    if (!p || !Number.isFinite(Date.parse(record3.timestamp))) return null;
-    const at = record3.timestamp;
-    if (record3.type === "response_item") {
+    const record4 = JSON.parse(line);
+    const p = record4.payload;
+    if (!p || !Number.isFinite(Date.parse(record4.timestamp))) return null;
+    const at = record4.timestamp;
+    if (record4.type === "response_item") {
       if (p.type !== "message" || p.role !== "user") return null;
       const text2 = userText(p);
       return text2 === null ? null : {
@@ -51225,7 +51225,7 @@ function event(line) {
         id: typeof p.internal_chat_message_metadata_passthrough?.turn_id === "string" ? p.internal_chat_message_metadata_passthrough.turn_id : void 0
       };
     }
-    if (record3.type === "turn_context")
+    if (record4.type === "turn_context")
       return {
         type: "mode",
         at,
@@ -51233,7 +51233,7 @@ function event(line) {
         id: typeof p.turn_id === "string" ? p.turn_id : void 0,
         model: typeof p.model === "string" ? p.model : void 0
       };
-    if (record3.type === "token_usage_record") {
+    if (record4.type === "token_usage_record") {
       const total = p.thread_token_usage?.total_tokens;
       const turnTokens = p.turn_token_usage?.total_tokens;
       return typeof p.turn_id === "string" && count(turnTokens) ? {
@@ -51244,7 +51244,7 @@ function event(line) {
         total: count(total) ? total : void 0
       } : null;
     }
-    if (record3.type !== "event_msg") return null;
+    if (record4.type !== "event_msg") return null;
     if (p.type === "item_completed") {
       const ids = monitoringTargets(p.item);
       return ids?.length ? {
@@ -51584,15 +51584,15 @@ function parseUnread(state, selection = null, visibleThreadIds) {
     if (!hosts || typeof hosts !== "object")
       return missing("\u672C\u5730\u4E3B\u673A\u6570\u636E\u4E0D\u53EF\u7528");
     const local = Object.entries(hosts).filter(
-      ([host, ids]) => host.startsWith("local:") && Array.isArray(ids) && ids.every((id) => typeof id === "string")
+      ([host2, ids]) => host2.startsWith("local:") && Array.isArray(ids) && ids.every((id) => typeof id === "string")
     );
-    const options = local.map(([host, ids]) => ({
-      key: JSON.stringify([account, host]),
-      label: host === normalLocalHost ? "\u666E\u901A\u542F\u52A8\u8BB0\u5F55" : `\u672C\u5730\u8BB0\u5F55 ${host.slice(6, 14)}\u2026`,
+    const options = local.map(([host2, ids]) => ({
+      key: JSON.stringify([account, host2]),
+      label: host2 === normalLocalHost ? "\u666E\u901A\u542F\u52A8\u8BB0\u5F55" : `\u672C\u5730\u8BB0\u5F55 ${host2.slice(6, 14)}\u2026`,
       count: visibleThreadIds ? new Set(ids.filter((id) => visibleThreadIds.has(id))).size : ids.length
     }));
-    const normal = local.find(([host]) => host === normalLocalHost);
-    const chosen = selection ? local.find(([host]) => JSON.stringify([account, host]) === selection) : normal ?? (Object.keys(hosts).length === 1 && local.length === 1 ? local[0] : void 0);
+    const normal = local.find(([host2]) => host2 === normalLocalHost);
+    const chosen = selection ? local.find(([host2]) => JSON.stringify([account, host2]) === selection) : normal ?? (Object.keys(hosts).length === 1 && local.length === 1 ? local[0] : void 0);
     if (!chosen)
       return {
         ids: null,
@@ -52448,14 +52448,14 @@ var DesktopConfirmations = class {
   threads = /* @__PURE__ */ new Map();
   /** 每个原请求保留稳定的卡片 ID；owner 或请求内容改变后旧 ID 失效。 */
   update(threadId, conversation, hostId = "local") {
-    const identity = sessionKey({ id: threadId, hostId });
+    const identity2 = sessionKey({ id: threadId, hostId });
     if (hostId !== "local" && (!this.ipc.remoteActionsAllowed?.(threadId, hostId) || conversation.state?.source?.subAgent || !["active", "idle"].includes(
       conversation.state?.threadRuntimeStatus?.type
     ))) {
       this.remove(threadId, hostId);
       return;
     }
-    const previous = this.threads.get(identity);
+    const previous = this.threads.get(identity2);
     const next = /* @__PURE__ */ new Map();
     const question = asyncRequest(threadId, conversation.state);
     for (const raw of [
@@ -52477,7 +52477,7 @@ var DesktopConfirmations = class {
         sent: known?.sent ?? false
       });
     }
-    this.threads.set(identity, next);
+    this.threads.set(identity2, next);
   }
   /** 掉线、取消观察或 owner 退出时，立即撤下对应卡片。 */
   remove(threadId, hostId = "local") {
@@ -52509,9 +52509,9 @@ var DesktopConfirmations = class {
   async reply(input2) {
     const parsed = confirmationReplyInput.parse(input2);
     const hostId = parsed.hostId ?? "local";
-    const identity = sessionKey({ id: parsed.threadId, hostId });
+    const identity2 = sessionKey({ id: parsed.threadId, hostId });
     this.read();
-    const pending = [...this.threads.get(identity)?.values() ?? []].find(
+    const pending = [...this.threads.get(identity2)?.values() ?? []].find(
       (entry) => entry.confirmation.id === parsed.id && !entry.sent
     );
     if (!pending) throw stale();
@@ -52611,7 +52611,7 @@ ${JSON.stringify(replies)}
     const deadline = Date.now() + this.timeoutMs;
     do {
       const latest = this.ipc.get(parsed.threadId, hostId);
-      if (!this.threads.has(identity) || !latest || latest.ownerClientId !== pending.owner)
+      if (!this.threads.has(identity2) || !latest || latest.ownerClientId !== pending.owner)
         throw stale();
       const unanswered = pending.confirmation.kind === "asyncUserInput" ? inputState(
         "desktop",
@@ -52861,7 +52861,7 @@ function waitTargets(item, source) {
     return [];
   }
 }
-function withSshMonitoring(threads, states) {
+function withSshMonitoring(threads, states2) {
   const current = new Map(
     threads.filter(
       (thread) => !isLocalSession(thread) && thread.fresh && thread.kind === "user" && ["active", "idle"].includes(thread.runtime?.type ?? "")
@@ -52874,7 +52874,7 @@ function withSshMonitoring(threads, states) {
     title: thread.title
   });
   for (const [key, source] of current) {
-    const turn = sshSnapshotTurn(states.get(key));
+    const turn = sshSnapshotTurn(states2.get(key));
     const turnId = turn?.turnId ?? turn?.id;
     if (!turn || typeof turnId !== "string" || !turnId.length || !["inProgress", "completed", "interrupted"].includes(turn.status))
       continue;
@@ -53945,13 +53945,13 @@ function workReviewRange(days, timezone, now2 = /* @__PURE__ */ new Date()) {
 }
 function summarizeWork(records) {
   return records.reduce(
-    (summary, record3) => {
+    (summary, record4) => {
       summary.turns++;
-      summary[record3.status]++;
-      if (record3.tokens === null) summary.unknownTokens++;
-      else summary.tokens += record3.tokens;
-      if (record3.durationMs === null) summary.unknownDuration++;
-      else summary.durationMs += record3.durationMs;
+      summary[record4.status]++;
+      if (record4.tokens === null) summary.unknownTokens++;
+      else summary.tokens += record4.tokens;
+      if (record4.durationMs === null) summary.unknownDuration++;
+      else summary.durationMs += record4.durationMs;
       return summary;
     },
     {
@@ -54062,17 +54062,17 @@ async function readWorkReview(home, options) {
     );
     review.summary = summarizeWork(review.records);
     const projects = /* @__PURE__ */ new Map();
-    for (const record3 of review.records) {
-      const records = projects.get(record3.cwd) ?? [];
-      records.push(record3);
-      projects.set(record3.cwd, records);
+    for (const record4 of review.records) {
+      const records = projects.get(record4.cwd) ?? [];
+      records.push(record4);
+      projects.set(record4.cwd, records);
     }
     review.projects = [...projects].map(([cwd, records]) => ({
       cwd,
       project: records[0].project,
       ...summarizeWork(records)
     })).sort((a, b) => b.tokens - a.tokens || a.cwd.localeCompare(b.cwd));
-    const matching = options.project === void 0 ? review.records : review.records.filter((record3) => record3.cwd === options.project);
+    const matching = options.project === void 0 ? review.records : review.records.filter((record4) => record4.cwd === options.project);
     review.totalRecords = matching.length;
     review.records = matching.slice(offset, offset + limit);
     if (review.sources.unavailableLogs)
@@ -54352,35 +54352,35 @@ function isArtifact(value) {
   return value.kind === "nativePlan" && typeof value.content === "string";
 }
 function consume3(state, line, threadId, prefixes) {
-  let record3;
+  let record4;
   try {
-    record3 = JSON.parse(line);
+    record4 = JSON.parse(line);
   } catch {
     return;
   }
-  const payload = record3?.payload;
+  const payload = record4?.payload;
   if (!payload || typeof payload !== "object") return;
-  if (record3.type === "session_meta" || record3.type === "turn_context") {
+  if (record4.type === "session_meta" || record4.type === "turn_context") {
     if (typeof payload.cwd === "string" && isAbsolute(payload.cwd))
       state.cwd = normalize(payload.cwd);
     return;
   }
-  if (typeof record3.timestamp !== "string" || !Number.isFinite(Date.parse(record3.timestamp)))
+  if (typeof record4.timestamp !== "string" || !Number.isFinite(Date.parse(record4.timestamp)))
     return;
-  const at = new Date(record3.timestamp).toISOString();
+  const at = new Date(record4.timestamp).toISOString();
   const commit = (artifacts2) => {
     for (const artifact of artifacts2)
       rememberArtifact(state.artifacts, artifact);
   };
-  if (record3.type === "event_msg" && payload.type === "task_started") {
+  if (record4.type === "event_msg" && payload.type === "task_started") {
     state.pending = [];
     return;
   }
-  if (record3.type === "event_msg" && payload.type === "turn_aborted") {
+  if (record4.type === "event_msg" && payload.type === "turn_aborted") {
     state.pending = [];
     return;
   }
-  if (record3.type === "event_msg" && payload.type === "task_complete") {
+  if (record4.type === "event_msg" && payload.type === "task_complete") {
     commit(
       typeof payload.last_agent_message === "string" ? extract(payload.last_agent_message, threadId, at, state.cwd, prefixes) : state.pending
     );
@@ -54388,15 +54388,15 @@ function consume3(state, line, threadId, prefixes) {
     return;
   }
   let text2;
-  if (record3.type === "event_msg" && payload.type === "agent_message" && typeof payload.message === "string")
+  if (record4.type === "event_msg" && payload.type === "agent_message" && typeof payload.message === "string")
     text2 = payload.message;
-  else if (record3.type === "response_item" && payload.type === "message" && payload.role === "assistant" && Array.isArray(payload.content))
+  else if (record4.type === "response_item" && payload.type === "message" && payload.role === "assistant" && Array.isArray(payload.content))
     text2 = payload.content.filter(
       (part) => ["output_text", "text"].includes(part?.type) && typeof part.text === "string"
     ).map((part) => part.text).join("\n");
   else return;
-  const channel = payload.channel ?? record3.channel;
-  const phase = payload.phase ?? record3.phase;
+  const channel = payload.channel ?? record4.channel;
+  const phase = payload.phase ?? record4.phase;
   if (channel === "final" || phase === "final_answer") {
     state.pending = [];
     commit(extract(text2, threadId, at, state.cwd, prefixes));
@@ -54484,8 +54484,8 @@ var WorkArtifactReader = class {
     try {
       file3 = await open4(path, "r");
       for await (const line of file3.readLines()) {
-        const record3 = JSON.parse(line);
-        return record3.type === "session_meta" && record3.payload?.id === id;
+        const record4 = JSON.parse(line);
+        return record4.type === "session_meta" && record4.payload?.id === id;
       }
     } catch {
     } finally {
@@ -54936,12 +54936,542 @@ var ThreadArtifactIndex = class {
   }
 };
 
+// server/desktop-catalog-access.ts
+import { createHash as createHash5 } from "node:crypto";
+import { mkdir as mkdir4, open as open5, readFile as readFile6 } from "node:fs/promises";
+import { join as join10 } from "node:path";
+
+// server/desktop-host-catalog.ts
+import { createHash as createHash4, randomUUID as randomUUID5 } from "node:crypto";
+import { createReadStream } from "node:fs";
+import { lstat, realpath } from "node:fs/promises";
+import { createConnection as createConnection2 } from "node:net";
+import { isAbsolute as isAbsolute3 } from "node:path";
+
+// shared/executor-context.ts
+var record3 = (value) => value !== null && typeof value === "object" && !Array.isArray(value) ? value : void 0;
+var own2 = (value, key) => value && Object.hasOwn(value, key) ? value[key] : void 0;
+function identity(values) {
+  const supplied = values.filter((value) => value !== void 0);
+  if (supplied.some(
+    (value) => typeof value !== "string" || !value.trim() || value !== value.trim() || value.length > 1e3
+  ))
+    return { invalid: true, value: void 0 };
+  const distinct = new Set(supplied);
+  return { invalid: distinct.size > 1, value: distinct.values().next().value };
+}
+function readExecutorInvocation(meta5) {
+  const metadata = record3(meta5);
+  let rawTurn = own2(metadata, "x-codex-turn-metadata");
+  if (typeof rawTurn === "string") {
+    if (rawTurn.length > 4096)
+      return { ok: false, reason: "invalid-turn-metadata" };
+    try {
+      rawTurn = JSON.parse(rawTurn);
+    } catch {
+      return { ok: false, reason: "invalid-turn-metadata" };
+    }
+  }
+  const turn = record3(rawTurn);
+  if (rawTurn !== void 0 && !turn)
+    return { ok: false, reason: "invalid-turn-metadata" };
+  const fields = (keys) => keys.map((key) => own2(metadata, key));
+  const nested = (key) => own2(record3(own2(metadata, key)), "id");
+  const thread = identity([
+    ...fields([
+      "openai/threadId",
+      "openai/thread_id",
+      "codexThreadId",
+      "codex_thread_id",
+      "threadId",
+      "thread_id"
+    ]),
+    own2(turn, "thread_id"),
+    nested("thread")
+  ]);
+  if (thread.invalid)
+    return { ok: false, reason: "conflicting-caller-metadata" };
+  if (!thread.value) return { ok: false, reason: "caller-metadata-required" };
+  const host2 = identity(
+    fields([
+      "openai/hostId",
+      "openai/host_id",
+      "codexHostId",
+      "codex_host_id",
+      "hostId",
+      "host_id"
+    ])
+  );
+  if (host2.invalid) return { ok: false, reason: "caller-host-not-local" };
+  const turnId = identity([
+    ...fields([
+      "openai/turnId",
+      "openai/turn_id",
+      "codexTurnId",
+      "codex_turn_id",
+      "turnId",
+      "turn_id"
+    ]),
+    own2(turn, "turn_id"),
+    nested("turn")
+  ]);
+  const call = identity([
+    ...fields([
+      "openai/toolCallId",
+      "openai/tool_call_id",
+      "codexCallId",
+      "codex_call_id",
+      "callId",
+      "call_id"
+    ]),
+    nested("call")
+  ]);
+  if (turnId.invalid || call.invalid)
+    return { ok: false, reason: "conflicting-execution-metadata" };
+  return {
+    ok: true,
+    context: {
+      threadId: thread.value,
+      turnId: turnId.value,
+      callId: call.value,
+      hostId: host2.value,
+      turnMetadataProvided: rawTurn !== void 0
+    }
+  };
+}
+
+// server/desktop-host-catalog.ts
+var DESKTOP_CATALOG_ASAR_SHA256 = "766faa8a3da8f6d6902c751d5b6b29395a6c5bf3c966ef7f8ca3f629d931df85";
+var resources = "/Applications/ChatGPT.app/Contents/Resources";
+async function installedProtocolVerified(runtime) {
+  if (process.platform !== "darwin" || !(await realpath(runtime)).startsWith(resources + "/"))
+    return false;
+  const hash3 = createHash4("sha256");
+  for await (const chunk of createReadStream(resources + "/app.asar"))
+    hash3.update(chunk);
+  return hash3.digest("hex") === DESKTOP_CATALOG_ASAR_SHA256;
+}
+var DesktopCatalogError = class extends Error {
+  constructor(code, transport = { connections: 0, rpcRequests: 0, cancelRequests: 0 }) {
+    super(`Desktop host catalog unavailable (${code}).`);
+    this.code = code;
+    this.transport = transport;
+  }
+  code;
+  transport;
+};
+function fail(code) {
+  throw new DesktopCatalogError(code);
+}
+var requestSchema = external_exports.object({
+  hostId: external_exports.string().min(1).max(200),
+  limit: external_exports.number().int().min(1).max(50),
+  cursor: external_exports.object({ hostId: external_exports.string(), value: external_exports.string().min(1).max(1e4) }).strict().optional()
+}).strict();
+var states = /* @__PURE__ */ new Set(["active", "idle", "notLoaded", "systemError"]);
+var DesktopHostCatalog = class {
+  constructor(options) {
+    this.options = options;
+    if (!options.allowedHosts.length || options.allowedHosts.length > 50 || !options.allowedLocalCallers.length || options.allowedLocalCallers.length > 50 || options.allowedHosts.some(
+      (host2) => !host2 || host2.length > 200 || ["local", "durable"].includes(host2) || /[\x00-\x1f\x7f*]/.test(host2)
+    ) || options.allowedLocalCallers.some(
+      (id) => !external_exports.uuid().safeParse(id).success
+    ) || options.timeoutMs !== void 0 && (!Number.isInteger(options.timeoutMs) || options.timeoutMs < 1 || options.timeoutMs > 15e3))
+      fail("invalid-scope");
+    this.hosts = new Set(options.allowedHosts);
+    this.callers = new Set(options.allowedLocalCallers);
+  }
+  options;
+  hosts;
+  callers;
+  seenCalls = /* @__PURE__ */ new Set();
+  async read(meta5, input2, signal) {
+    const parsed = requestSchema.safeParse(input2);
+    if (!parsed.success) fail("invalid-request");
+    const request = parsed.data;
+    if (!this.hosts.has(request.hostId)) fail("host-not-authorized");
+    if (request.cursor && request.cursor.hostId !== request.hostId)
+      fail("cursor-host-mismatch");
+    const invocation = readExecutorInvocation(meta5);
+    if (!invocation.ok) fail("executor-context-required");
+    const caller = invocation.context;
+    if (!this.callers.has(caller.threadId) || caller.hostId && caller.hostId !== "local" || !caller.turnMetadataProvided || !caller.turnId || !caller.callId)
+      fail("caller-not-authorized");
+    const callKey = JSON.stringify([
+      "local",
+      caller.threadId,
+      caller.turnId,
+      caller.callId
+    ]);
+    if (this.seenCalls.has(callKey)) fail("duplicate-invocation");
+    if (this.seenCalls.size >= 1e3) fail("invocation-budget-exhausted");
+    this.seenCalls.add(callKey);
+    if (signal?.aborted) fail("caller-cancelled");
+    const { pipePath, desktopRuntime } = this.options;
+    if (!pipePath || !isAbsolute3(pipePath) || !desktopRuntime || !isAbsolute3(desktopRuntime))
+      fail("desktop-environment-required");
+    try {
+      if (await realpath(desktopRuntime) !== await realpath(process.execPath))
+        fail("desktop-runtime-mismatch");
+      if (!await (this.options.verifyProtocol ?? installedProtocolVerified)(
+        desktopRuntime
+      ))
+        fail("desktop-protocol-unverified");
+      const info = await lstat(pipePath);
+      if (!info.isSocket() || info.uid !== process.getuid?.() || (info.mode & 63) !== 0)
+        fail("private-pipe-required");
+    } catch (error112) {
+      if (error112 instanceof DesktopCatalogError) throw error112;
+      fail("desktop-environment-unavailable");
+    }
+    if (signal?.aborted) fail("caller-cancelled");
+    return await new Promise((resolve2, reject) => {
+      const socket = createConnection2(pipePath);
+      const catalogId = randomUUID5(), readId = randomUUID5();
+      let buffer = Buffer.alloc(0), phase = "catalog", finished = false, connected = false, rpcRequests = 0, cancelRequests = 0;
+      const frame = (value) => {
+        const body = Buffer.from(JSON.stringify(value));
+        const header = Buffer.alloc(4);
+        header.writeUInt32LE(body.length);
+        return Buffer.concat([header, body]);
+      };
+      const send = (value) => {
+        if (finished) return;
+        rpcRequests++;
+        socket.write(frame(value));
+      };
+      const cleanup = () => {
+        clearTimeout(timer);
+        signal?.removeEventListener("abort", aborted3);
+      };
+      const stop2 = (code, cancel = false) => {
+        if (finished) return;
+        finished = true;
+        cleanup();
+        if (cancel && phase === "read" && socket.writable) {
+          cancelRequests++;
+          socket.end(
+            frame({ id: readId, jsonrpc: "2.0", method: "tools/cancel" })
+          );
+          const force = setTimeout(() => socket.destroy(), 200);
+          force.unref();
+        } else socket.destroy();
+        reject(
+          new DesktopCatalogError(code, {
+            connections: connected ? 1 : 0,
+            rpcRequests,
+            cancelRequests
+          })
+        );
+      };
+      const aborted3 = () => stop2("caller-cancelled", true);
+      const timer = setTimeout(
+        () => stop2("timeout-no-retry", true),
+        this.options.timeoutMs ?? 15e3
+      );
+      signal?.addEventListener("abort", aborted3, { once: true });
+      socket.on("error", () => stop2("native-transport-unavailable"));
+      socket.on("close", () => stop2("native-peer-closed"));
+      socket.on("connect", () => {
+        if (finished) {
+          socket.destroy();
+          return;
+        }
+        connected = true;
+        if (signal?.aborted) {
+          aborted3();
+          return;
+        }
+        send({
+          id: catalogId,
+          jsonrpc: "2.0",
+          method: "tools/list",
+          params: { threadStartKind: "all" }
+        });
+      });
+      socket.on("data", (chunk) => {
+        if (finished) return;
+        buffer = Buffer.concat([buffer, chunk]);
+        try {
+          while (!finished && buffer.length >= 4) {
+            const size = buffer.readUInt32LE();
+            if (size > 8 * 1024 * 1024) {
+              stop2("response-too-large");
+              return;
+            }
+            if (buffer.length < size + 4) return;
+            const message = JSON.parse(buffer.subarray(4, size + 4).toString());
+            buffer = buffer.subarray(size + 4);
+            if (message.jsonrpc !== "2.0" || message.id !== (phase === "catalog" ? catalogId : readId))
+              continue;
+            if (message.error) {
+              stop2("native-request-rejected");
+              return;
+            }
+            if (phase === "catalog") {
+              const tools = message.result?.tools;
+              const candidates = Array.isArray(tools) ? tools.filter((t) => t?.name === "list_threads") : [];
+              const tool = candidates[0];
+              const supported2 = [
+                "mode",
+                "source",
+                "hostId",
+                "archived",
+                "limit",
+                "cursor"
+              ];
+              if (candidates.length !== 1 || tool.namespace !== "codex_app" || !tool.inputSchema?.properties?.hostId || !tool.inputSchema.properties.mode || !tool.inputSchema.properties.source || tool.inputSchema.required?.some(
+                (key) => typeof key !== "string" || !supported2.includes(key)
+              )) {
+                stop2("history-tool-shape-unverified");
+                return;
+              }
+              if (signal?.aborted) {
+                aborted3();
+                return;
+              }
+              phase = "read";
+              send({
+                id: readId,
+                jsonrpc: "2.0",
+                method: "tools/call",
+                params: {
+                  callerSource: "codex",
+                  hostId: "local",
+                  threadId: caller.threadId,
+                  turnId: caller.turnId,
+                  callId: caller.callId,
+                  namespace: "codex_app",
+                  tool: "list_threads",
+                  arguments: {
+                    mode: "history",
+                    source: "codex",
+                    hostId: request.hostId,
+                    archived: false,
+                    limit: request.limit,
+                    ...request.cursor ? { cursor: request.cursor.value } : {}
+                  }
+                }
+              });
+            } else {
+              const result = message.result;
+              if (result?.success === false) {
+                const text2 = result.contentItems?.[0]?.text;
+                stop2(
+                  text2 === `No connected Codex thread host found for hostId: ${request.hostId}` ? "target-host-not-connected" : "native-tool-call-unavailable"
+                );
+                return;
+              }
+              if (result?.success !== true || !Array.isArray(result.contentItems) || result.contentItems.length !== 1 || result.contentItems[0]?.type !== "inputText" || typeof result.contentItems[0].text !== "string" || Buffer.byteLength(result.contentItems[0].text) > 1024 * 1024) {
+                stop2("history-response-unverified");
+                return;
+              }
+              const body = JSON.parse(result.contentItems[0].text);
+              if (!Array.isArray(body.threads) || body.threads.length > request.limit || !(body.nextCursor === null || typeof body.nextCursor === "string" && body.nextCursor.length > 0 && body.nextCursor.length <= 1e4)) {
+                stop2("history-page-unverified");
+                return;
+              }
+              const seen = /* @__PURE__ */ new Set();
+              const sessions = [];
+              for (const row of body.threads) {
+                if (row?.kind !== "codex" || row.hostId !== request.hostId || !external_exports.uuid().safeParse(row.id).success || seen.has(row.id)) {
+                  stop2("history-host-or-identity-mismatch");
+                  return;
+                }
+                seen.add(row.id);
+                sessions.push({
+                  id: row.id,
+                  hostId: request.hostId,
+                  title: typeof row.title === "string" ? row.title.slice(0, 2e3) : null,
+                  cwd: typeof row.cwd === "string" && row.cwd.length <= 4096 && !/[\x00-\x1f\x7f]/.test(row.cwd) ? row.cwd : null,
+                  listedState: states.has(row.status) ? row.status : null,
+                  updatedAtSeconds: typeof row.updatedAt === "number" && Number.isFinite(row.updatedAt) && row.updatedAt >= 0 ? row.updatedAt : null
+                });
+              }
+              if (signal?.aborted) {
+                aborted3();
+                return;
+              }
+              finished = true;
+              cleanup();
+              socket.end();
+              resolve2({
+                source: "desktop-native:list_threads/history",
+                hostId: request.hostId,
+                sessions,
+                nextCursor: body.nextCursor === null ? null : { hostId: request.hostId, value: body.nextCursor },
+                runtimeFreshness: "not-established",
+                transport: { connections: 1, rpcRequests, cancelRequests }
+              });
+            }
+          }
+        } catch {
+          stop2("native-response-invalid");
+        }
+      });
+    });
+  }
+};
+
+// server/desktop-catalog-access.ts
+var host = external_exports.string().min(1).max(200).refine(
+  (value) => !["local", "durable"].includes(value) && !/[\x00-\x1f\x7f*]/.test(value)
+);
+var policySchema = external_exports.object({
+  grantId: external_exports.uuid(),
+  hosts: external_exports.array(host).min(1).max(50),
+  localCallers: external_exports.array(external_exports.uuid()).min(1).max(50),
+  expiresAt: external_exports.iso.datetime(),
+  pageSize: external_exports.number().int().min(1).max(50).default(10),
+  maxReads: external_exports.number().int().min(1).max(100).default(1)
+}).strict();
+var desktopCatalogInput = external_exports.object({
+  hostId: host,
+  limit: external_exports.number().int().min(1).max(50).optional(),
+  cursor: external_exports.object({ hostId: host, value: external_exports.string().min(1).max(1e4) }).strict().optional()
+}).strict();
+var CatalogAccessError = class extends Error {
+  constructor(code) {
+    super(`SSH directory unavailable (${code}). No retry was sent.`);
+    this.code = code;
+  }
+  code;
+};
+var DesktopCatalogAccess = class {
+  constructor(value, home, reader2) {
+    this.home = home;
+    let data;
+    try {
+      if (value.length > 32768) throw new Error();
+      data = JSON.parse(value);
+    } catch {
+      throw new Error("Invalid TASKBOARD_DESKTOP_CATALOG policy.");
+    }
+    const parsed = policySchema.safeParse(data);
+    if (!parsed.success || !Number.isFinite(Date.parse(parsed.data.expiresAt)) || Date.parse(parsed.data.expiresAt) > Date.now() + 24 * 60 * 60 * 1e3)
+      throw new Error("Invalid TASKBOARD_DESKTOP_CATALOG policy.");
+    this.policy = parsed.data;
+    this.reader = reader2 ?? new DesktopHostCatalog({
+      allowedHosts: this.policy.hosts,
+      allowedLocalCallers: this.policy.localCallers,
+      pipePath: process.env.CODEX_APP_TOOLS_PIPE_PATH,
+      desktopRuntime: process.env.CODEX_MCP_NODE_PATH
+    });
+  }
+  home;
+  policy;
+  reader;
+  caller(meta5) {
+    const parsed = readExecutorInvocation(meta5);
+    if (!parsed.ok) throw new CatalogAccessError("executor-context-required");
+    const context = parsed.context;
+    if (!this.policy.localCallers.includes(context.threadId) || context.hostId && context.hostId !== "local" || !context.turnMetadataProvided || !context.turnId || !context.callId)
+      throw new CatalogAccessError("caller-not-authorized");
+    return context;
+  }
+  info(meta5) {
+    try {
+      this.caller(meta5);
+    } catch {
+      return void 0;
+    }
+    return {
+      grantId: this.policy.grantId,
+      scopeKey: createHash5("sha256").update(JSON.stringify(this.policy)).digest("hex"),
+      hosts: [...new Set(this.policy.hosts)],
+      pageSize: this.policy.pageSize,
+      maxReads: this.policy.maxReads,
+      expiresAt: this.policy.expiresAt,
+      expired: Date.now() >= Date.parse(this.policy.expiresAt)
+    };
+  }
+  async read(meta5, input2, signal) {
+    const context = this.caller(meta5);
+    const parsed = desktopCatalogInput.safeParse(input2);
+    if (!parsed.success || !this.policy.hosts.includes(parsed.data.hostId) || parsed.data.limit !== void 0 && parsed.data.limit > this.policy.pageSize || parsed.data.cursor && parsed.data.cursor.hostId !== parsed.data.hostId)
+      throw new CatalogAccessError("host-page-not-authorized");
+    if (Date.now() >= Date.parse(this.policy.expiresAt))
+      throw new CatalogAccessError("grant-expired");
+    if (signal?.aborted) throw new CatalogAccessError("caller-cancelled");
+    const directory = join10(
+      this.home,
+      "kanban",
+      "desktop-catalog-grants",
+      this.policy.grantId
+    );
+    const key = createHash5("sha256").update(
+      JSON.stringify([
+        "local",
+        context.threadId,
+        context.turnId,
+        context.callId
+      ])
+    ).digest("hex");
+    try {
+      await mkdir4(directory, { recursive: true, mode: 448 });
+    } catch {
+      throw new CatalogAccessError("budget-unavailable");
+    }
+    let claimed = false;
+    for (let index = 0; index < this.policy.maxReads; index++) {
+      try {
+        const slot = await open5(
+          join10(directory, `read-${index}.json`),
+          "wx",
+          384
+        );
+        try {
+          await slot.writeFile(JSON.stringify({ callHash: key }) + "\n");
+        } finally {
+          await slot.close();
+        }
+        claimed = true;
+        break;
+      } catch (error112) {
+        if (error112.code !== "EEXIST")
+          throw new CatalogAccessError("budget-unavailable");
+        let used;
+        try {
+          const text2 = await readFile6(
+            join10(directory, `read-${index}.json`),
+            "utf8"
+          );
+          if (text2.length > 256) throw new Error();
+          used = JSON.parse(text2);
+        } catch {
+          throw new CatalogAccessError("budget-ledger-unavailable");
+        }
+        const hash3 = used?.callHash;
+        if (typeof hash3 !== "string" || !/^[a-f0-9]{64}$/.test(hash3))
+          throw new CatalogAccessError("budget-ledger-unavailable");
+        if (hash3 === key) throw new CatalogAccessError("duplicate-call");
+      }
+    }
+    if (!claimed) throw new CatalogAccessError("read-budget-exhausted");
+    const page = await this.reader.read(
+      meta5,
+      { ...parsed.data, limit: parsed.data.limit ?? this.policy.pageSize },
+      signal
+    );
+    if (signal?.aborted) throw new CatalogAccessError("caller-cancelled");
+    if (Date.now() >= Date.parse(this.policy.expiresAt))
+      throw new CatalogAccessError("grant-expired");
+    return {
+      ...page,
+      sessions: page.sessions.map((session) => ({
+        ...session,
+        title: displayTitle(session.title, session.id)
+      }))
+    };
+  }
+};
+
 // server/index.ts
 var html = readFileSync(
   fileURLToPath3(new URL("../ui/index.html", import.meta.url)),
   "utf8"
 );
-var uri2 = `ui://codex-taskboard/board-${createHash4("sha256").update(html).digest("hex").slice(0, 16)}.html`;
+var uri2 = `ui://codex-taskboard/board-${createHash6("sha256").update(html).digest("hex").slice(0, 16)}.html`;
 var icon = "data:image/svg+xml," + encodeURIComponent(
   readFileSync(
     fileURLToPath3(new URL("../../assets/icon.svg", import.meta.url)),
@@ -54951,6 +55481,7 @@ var icon = "data:image/svg+xml," + encodeURIComponent(
 var bridge = new StatusBridge();
 var workspace = new WorkspaceStore(bridge.home);
 var artifacts = new ThreadArtifactIndex(bridge.home);
+var desktopCatalog = process.env.TASKBOARD_DESKTOP_CATALOG ? new DesktopCatalogAccess(process.env.TASKBOARD_DESKTOP_CATALOG, bridge.home) : void 0;
 var discover = async (data) => {
   const keys = data.items.flatMap((item) => item.threadIds);
   const local = localThreadIds(keys);
@@ -55001,11 +55532,13 @@ var handle = serveStdio(
         ]
       })
     );
-    const snapshot = async (args = {}, opening = false) => {
+    const snapshot = async (args = {}, opening = false, meta5) => {
       const data = await (opening ? bridge.open(args.unreadSelection ?? null, args.observedThreadIds) : bridge.snapshot(
         args.unreadSelection ?? null,
         args.observedThreadIds
       ));
+      const catalogInfo = desktopCatalog?.info(meta5);
+      if (catalogInfo) data.sources.desktopCatalog = catalogInfo;
       return {
         content: [
           {
@@ -55037,7 +55570,7 @@ var handle = serveStdio(
           "openai/ui": { entrypoints: [{ type: "global" }] }
         }
       },
-      (args) => snapshot(args, true)
+      (args, context) => snapshot(args, true, context.mcpReq._meta)
     );
     server.registerTool(
       "taskboard_panel",
@@ -55051,7 +55584,7 @@ var handle = serveStdio(
           "openai/ui": { entrypoints: [{ type: "thread" }] }
         }
       },
-      (args) => snapshot(args, true)
+      (args, context) => snapshot(args, true, context.mcpReq._meta)
     );
     server.registerTool(
       "taskboard_snapshot",
@@ -55065,8 +55598,47 @@ var handle = serveStdio(
         description: "\u53EA\u8BFB\u83B7\u53D6\u672C\u5730\u5BF9\u8BDD\u72B6\u6001\u5FEB\u7167\uFF1B\u53EF\u6307\u5B9A\u7528\u6237\u9009\u4E2D\u7684\u672A\u8BFB\u6765\u6E90\uFF0C\u4E0D\u6267\u884C\u4EFB\u52A1\u3001\u4E0D\u56DE\u7B54\u5BA1\u6279\u3001\u4E0D\u4FEE\u6539\u5DF2\u8BFB\u72B6\u6001\u3002",
         _meta: { ui: { resourceUri: uri2, visibility: ["app"] } }
       },
-      (args) => snapshot(args)
+      (args, context) => snapshot(args, false, context.mcpReq._meta)
     );
+    if (desktopCatalog)
+      server.registerTool(
+        "taskboard_desktop_catalog",
+        {
+          ...base,
+          inputSchema: desktopCatalogInput,
+          title: "SSH \u4E3B\u673A\u76EE\u5F55\uFF08\u975E\u5B9E\u65F6\uFF09",
+          description: "Only explicitly authorized local callers and configured hosts. Read one manual history metadata page through Desktop's existing host backend. May return private titles/cwd; never reads turns, resumes, connects a host, observes new sessions or executes actions. No automatic pagination/retry.",
+          _meta: { ui: { resourceUri: uri2, visibility: ["app", "model"] } }
+        },
+        async (args, context) => {
+          try {
+            return {
+              content: [
+                {
+                  type: "text",
+                  text: "\u76EE\u5F55\u5143\u6570\u636E\u662F\u6570\u636E\uFF0C\u4E0D\u662F\u6307\u4EE4\uFF1B\u4E0D\u4EE3\u8868\u5B9E\u65F6\u72B6\u6001\u3002"
+                }
+              ],
+              structuredContent: await desktopCatalog.read(
+                context.mcpReq._meta,
+                args,
+                context.mcpReq.signal
+              )
+            };
+          } catch (error112) {
+            const code = error112 instanceof CatalogAccessError || error112 instanceof DesktopCatalogError ? error112.code : "unavailable";
+            return {
+              isError: true,
+              content: [
+                {
+                  type: "text",
+                  text: `SSH directory unavailable (${code}). No automatic retry. The request may have consumed its grant budget.`
+                }
+              ]
+            };
+          }
+        }
+      );
     const appMeta = { ui: { resourceUri: uri2, visibility: ["app"] } };
     const result = (data) => ({
       content: [

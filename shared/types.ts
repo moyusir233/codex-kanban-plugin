@@ -1,4 +1,5 @@
 import type { Confirmations } from "./confirmations.js";
+import type { DesktopCatalogAvailability } from "./desktop-catalog.js";
 
 export type ConnectionState =
   "connecting" | "connected" | "disconnected" | "disabled";
@@ -88,6 +89,8 @@ export type Snapshot = {
     message: string | null;
   };
   sources: {
+    /** Caller-bound, expiring opt-in; never restore this capability from cache. */
+    desktopCatalog?: DesktopCatalogAvailability;
     metadata: boolean;
     unread: boolean;
     unreadReason: string;

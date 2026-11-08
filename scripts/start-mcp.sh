@@ -5,6 +5,17 @@ taskboard_root=$(CDPATH= cd "$(dirname "$0")/.." && pwd)
 taskboard_entry="$taskboard_root/${1:-runtime/server/index.mjs}"
 [ "$#" -eq 0 ] || shift
 taskboard_path_node=$(command -v node || true)
+taskboard_board_entry=1
+# This shared bootstrap also launches the existing Desktop stdio forwarder.
+# Its executor environment belongs to Desktop itself and must remain intact.
+[ "$taskboard_entry" != "$taskboard_root/scripts/desktop-cli.mjs" ] || taskboard_board_entry=0
+# Caller identities come only from this request's executor metadata. Never use
+# inherited identities, verification material or private authorization switches.
+if [ "$taskboard_board_entry" = 1 ]; then
+  unset CODEX_APP_TOOLS_CALLER_HOST_ID CODEX_THREAD_ID CODEX_SESSION_ID CODEX_TOOL_CALL_ID
+  unset CODEX_TASK_WORKSPACE_VERIFYING_IDENTITY NODE_REPL_HOST_SERVICES_PIPE_PATH
+  unset CODEX_BROWSER_USE_PEER_AUTHORIZATION CODEX_INTERNAL_ORIGINATOR_OVERRIDE INTERNAL_ORIGINATOR_OVERRIDE
+fi
 
 # 检查运行所需能力，探测输出不能混入 MCP 的标准输出。
 taskboard_node_works() {
@@ -15,6 +26,25 @@ taskboard_node_works() {
     if (typeof WebSocket !== "function") process.exit(1);
   ' >/dev/null 2>&1
 }
+
+# Native catalog access is a separately granted opt-in. Only the normal Desktop
+# runtime may run it; never synthesize trust via a fallback or ancestry shim.
+if [ "$taskboard_board_entry" = 1 ] && [ -n "${TASKBOARD_DESKTOP_CATALOG:-}" ]; then
+  case "${CODEX_MCP_NODE_PATH:-}" in
+    /*) ;;
+    *) printf '%s\n' 'SSH directory requires the Desktop-injected MCP runtime.' >&2; exit 1 ;;
+  esac
+  if ! taskboard_node_works "$CODEX_MCP_NODE_PATH"; then
+    printf '%s\n' 'Desktop MCP runtime is incompatible; native catalog fallback is disabled.' >&2
+    exit 1
+  fi
+  exec "$CODEX_MCP_NODE_PATH" "$taskboard_entry" "$@"
+fi
+# A normal board process must not retain native transport fields just because
+# its executor supplied them. Caller/trust/security variables are never opted in.
+if [ "$taskboard_board_entry" = 1 ]; then
+  unset CODEX_APP_TOOLS_PIPE_PATH CODEX_MCP_NODE_PATH
+fi
 
 # 桌面端可能继承旧版 Node，继续查找 NVM 和 Homebrew 中的兼容版本。
 for taskboard_node in \

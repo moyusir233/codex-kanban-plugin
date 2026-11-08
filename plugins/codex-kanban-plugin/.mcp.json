@@ -12,12 +12,15 @@
         "CODEX_HOME",
         "TASKBOARD_WS_URL",
         "TASKBOARD_SSH_SESSIONS",
-        "TASKBOARD_SSH_ACTIONS"
+        "TASKBOARD_SSH_ACTIONS",
+        "TASKBOARD_DESKTOP_CATALOG",
+        "CODEX_APP_TOOLS_PIPE_PATH",
+        "CODEX_MCP_NODE_PATH"
       ],
       "startup_timeout_sec": 180,
       "tool_timeout_sec": 60,
       "env": {
-        "TASKBOARD_BUILD_ID": "b54bb729a0a806150aad3668420fcb8a7fcc9c7bfc5c27cb7393caf8e7874564"
+        "TASKBOARD_BUILD_ID": "c7541a6898fa9b95313d2f5e28d9a2f0dc143379d63dcd7205d99e4ced2bbd79"
       }
     }
   }

@@ -305,7 +305,6 @@ for (const { packaged, actions } of [
         );
         assert.equal(env.TASKBOARD_SSH_ACTIONS, supplied.TASKBOARD_SSH_ACTIONS);
         for (const key of [
-          "CODEX_APP_TOOLS_PIPE_PATH",
           "CODEX_APP_TOOLS_CALLER_HOST_ID",
           "CODEX_TASK_WORKSPACE_VERIFYING_IDENTITY",
           "NODE_REPL_HOST_SERVICES_PIPE_PATH",
@@ -313,6 +312,12 @@ for (const { packaged, actions } of [
         ]) {
           assert.equal(env[key], undefined, key);
         }
+        // This field is now an explicitly staged transport, not caller authority.
+        // start-mcp.sh removes it before Node unless a valid native policy is opted in.
+        assert.equal(
+          env.CODEX_APP_TOOLS_PIPE_PATH,
+          supplied.CODEX_APP_TOOLS_PIPE_PATH,
+        );
         await client.connect(transport);
         await client.callTool({ name: "taskboard_open", arguments: {} });
         const readSnapshot = async () => {

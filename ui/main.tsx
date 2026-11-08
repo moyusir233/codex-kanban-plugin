@@ -58,6 +58,7 @@ import { ThreadConfirmations } from "./thread-confirmations";
 import type { Confirmations } from "../shared/confirmations";
 import { DetectedArtifacts } from "./detected-artifacts";
 import { ArtifactRulesSettings } from "./artifact-rules";
+import { DesktopCatalogPanel } from "./desktop-catalog";
 import { WorkItems, WorkReviewPanel } from "./workspace";
 import {
   DEFAULT_FILTERS,
@@ -996,6 +997,9 @@ function Board() {
             {t(snapshot?.sources.unreadReason ?? "正在检查数据源")}
             {t("。未读记录属于客户端内部格式，兼容性可能随版本变化。")}
           </p>
+          {snapshot?.sources.desktopCatalog && (
+            <DesktopCatalogPanel access={snapshot.sources.desktopCatalog} />
+          )}
           <ArtifactRulesSettings
             onSaved={() => setArtifactRevision((current) => current + 1)}
           />

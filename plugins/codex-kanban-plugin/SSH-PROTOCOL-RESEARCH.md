@@ -6,6 +6,69 @@ the absent Desktop describe the original research environment. See
 [Desktop acceptance preparation](https://github.com/moyusir233/codex-kanban-plugin/blob/feat/ssh-session-observer/SSH-DESKTOP-ACCEPTANCE.md) for the verified
 versions, disposable-session setup and still-unfinished integration/live gates.
 This match does not establish a new ordinary-plugin host-service export.
+The later authorized exact-pair open produced v11 snapshots through the actual
+source/distribution MCP route. That is bounded explicit-observer evidence, not
+catalog or complete host-service parity. The separate ordinary-plugin executor
+probe remains an integration experiment, not a routed adapter.
+
+## Additional installed/live findings — 2026-11-08
+
+The separately approved ordinary-plugin experiment in
+[Desktop acceptance](https://github.com/moyusir233/codex-kanban-plugin/blob/feat/ssh-session-observer/SSH-DESKTOP-ACCEPTANCE.md)
+now establishes real executor metadata and pipe delivery, and successful native
+`tools/list` through the normal Desktop-injected runtime. This supersedes only
+the earlier **unverified ordinary-process native admission/catalog** boundary;
+it does not establish arbitrary host-manager RPC, host discovery, remote files,
+or complete parity. The existing installed Kanban's environment/bytes are unchanged.
+The subsequently rebuilt fork stages policy + pipe + normal runtime under an
+explicit expiring catalog grant; startup strips transport when off and never
+forwards caller/trust switches. This is an evidenced narrow contract update,
+not a general native relay. One authorized exact-host directory read succeeded;
+normal-board UI live acceptance remains separate and unfinished.
+
+Two newly traced safety distinctions matter before using those native tools:
+
+- Renderer182735 module `q7pe`, `l` (entry offset 1901540 vicinity) treats
+  `preferredHostId` as a preference, not a mandatory target. After its failed
+  read it queries other connected managers. Renderer497066 `case A.Dv` calls
+  that resolver and can additionally try ChatGPT fallback. Returning-row
+  validation would be too late to prevent these extra reads. `read_thread` is
+  therefore **not** an exact-pair read adapter, even with explicit `hostId`.
+- Renderer497066 `rV.pollThread` / `resolveThreadHost` also fall back after a
+  preferred-host failure. The `new rV` factory supplies `getManagers: () => ...`
+  over all ready connected managers; it ignores the resolver's preferred-host
+  argument. Explicit `wait_threads` targets do not remove this failure-path
+  read-scope problem. No live wait/read probe was performed.
+- By contrast renderer497066 `tO` checks the requested host is connected and has
+  a client, then `tS` sends `thread/list` only through that host manager. The
+  history/codex branch does not connect another host or fall back. `tS` may fill
+  a requested normal-result window with additional internally filtered pages.
+  Its `tR` result contains title/cwd/status and summary/project annotations; the
+  new strict-host component deliberately drops summary/project fields. A live
+  host-directory read requires a separately agreed metadata scope.
+
+The installed app-tools `NativePipeClient` uses four-byte little-endian frames
+and JSON-RPC `tools/list` with `threadStartKind`; there is no additional client
+handshake in that code. Bootstrap854 `lk` accepts both number and string RPC IDs.
+The NVM-runtime probe's closed peer was **not** assigned a proven rejection
+reason. `ld` can enforce native process authorization on packaged macOS builds;
+the native addon and the NVM/bundled runtime signing identities differ. The next
+explicitly approved trial used only the actual injected runtime via direct
+`exec`, without changing signatures, adding ancestors or overriding trust. It
+returned 60 sanitized tool definitions. This is current-version live evidence,
+not a grant inferred from a pipe name or a stable public API promise.
+
+Public cross-checks (read 2026-11-08):
+
+- [Desktop-only plugins](https://developers.openai.com/plugins/deploy/desktop-only)
+  permits ordinary local stdio MCP runtimes; it does not promise private native
+  host services.
+- [Plugin packaging](https://developers.openai.com/plugins/build/plugins)
+  documents local-cache/update/restart behavior and scoped server configuration.
+- [Codex issue #47425](https://github.com/openai/codex/issues/47425) reports
+  runtime/ancestry-sensitive native closures on a different version/topology.
+  It is external corroboration, **not** proof of this machine's closure reason
+  or permission to use its shim/symlink/relay workarounds. None were adopted.
 
 ## Scope and provenance
 
