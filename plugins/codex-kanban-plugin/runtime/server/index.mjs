@@ -51636,9 +51636,10 @@ async function readLocalData(home, selection = null) {
     const rollout = columns.has("rollout_path") ? "rollout_path" : "NULL AS rollout_path";
     const fields = `id, title, ${name}, ${model}, ${effort}, ${rollout}, cwd, updated_at, source, ${kind}, ${role}`;
     const rows = [];
-    for (const row of database.prepare(
+    const recent = database.prepare(
       `SELECT ${fields} FROM threads WHERE archived=0 ORDER BY updated_at DESC`
-    ).iterate()) {
+    );
+    for (const row of recent.iterate()) {
       if (threadKind(row) !== "user") continue;
       rows.push(row);
       if (rows.length === 500) break;

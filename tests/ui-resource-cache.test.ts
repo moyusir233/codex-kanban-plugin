@@ -19,7 +19,7 @@ test("UI resources invalidate cached HTML after a same-version reinstall", async
       args: [join(plugin, "runtime/server/index.mjs")],
       cwd: home,
       env: {
-        HOME: process.env.HOME ?? "",
+        HOME: home,
         PATH: process.env.PATH ?? "",
         CODEX_HOME: home,
         TASKBOARD_WS_URL: "ws://127.0.0.1:1",

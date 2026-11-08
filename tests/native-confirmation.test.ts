@@ -8,6 +8,7 @@ import net from "node:net";
 import { createInterface } from "node:readline";
 import { join, resolve } from "node:path";
 import { tmpdir } from "node:os";
+import { fixtureEnv } from "./fixture-env";
 import {
   readConfirmations,
   replyToConfirmation,
@@ -115,12 +116,11 @@ for (const packaged of [false, true]) {
           : "scripts/desktop-cli.mjs",
       );
       const child = spawn(process.execPath, [script, "app-server"], {
-        env: {
-          ...process.env,
-          CODEX_HOME: home,
+        env: fixtureEnv(home, {
           TASKBOARD_CODEX_CLI: cli,
           TASKBOARD_WS_URL: endpoint,
-        },
+        }),
+        cwd: home,
         stdio: ["pipe", "pipe", "pipe"],
       });
       const finished = once(child, "exit");

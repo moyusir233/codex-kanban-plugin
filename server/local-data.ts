@@ -262,11 +262,12 @@ export async function readLocalData(
     const fields = `id, title, ${name}, ${model}, ${effort}, ${rollout}, cwd, updated_at, source, ${kind}, ${role}`;
     const rows: any[] = [];
     // 先按既有规则排除内部子 Agent，再计算最近 500 条，避免挤掉用户对话。
-    for (const row of database
-      .prepare(
-        `SELECT ${fields} FROM threads WHERE archived=0 ORDER BY updated_at DESC`,
-      )
-      .iterate()) {
+    // Keep the statement alive while iterating: some supported node:sqlite
+    // versions do not retain it through an iterator and can finalize it on GC.
+    const recent = database.prepare(
+      `SELECT ${fields} FROM threads WHERE archived=0 ORDER BY updated_at DESC`,
+    );
+    for (const row of recent.iterate()) {
       if (threadKind(row) !== "user") continue;
       rows.push(row);
       if (rows.length === 500) break;

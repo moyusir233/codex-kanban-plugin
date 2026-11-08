@@ -9,6 +9,7 @@ import { createInterface } from "node:readline";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { StatusBridge } from "../server/status-bridge";
+import { fixtureEnv } from "./fixture-env";
 
 const cli =
   process.env.TASKBOARD_CODEX_CLI ??
@@ -88,7 +89,8 @@ test(
       `model='fixture'\nmodel_provider='fixture'\n[model_providers.fixture]\nname='fixture'\nbase_url='http://127.0.0.1:${modelPort}'\nwire_api='responses'\nrequires_openai_auth=false\n`,
     );
     const child = spawn(cli, ["app-server", "--listen", "stdio://"], {
-      env: { ...process.env, CODEX_HOME: home },
+      env: fixtureEnv(home),
+      cwd: home,
       stdio: ["pipe", "pipe", "pipe"],
     });
     const finished = once(child, "exit");
@@ -287,7 +289,11 @@ test(
     });
     const previousEndpoint = process.env.TASKBOARD_WS_URL;
     delete process.env.TASKBOARD_WS_URL;
-    const bridge = new StatusBridge({ home });
+    const bridge = new StatusBridge({
+      home,
+      sshSessions: "[]",
+      sshActions: "[]",
+    });
     try {
       await request("initialize", {
         clientInfo: { name: "isolated_native_ipc_fixture", version: "1" },

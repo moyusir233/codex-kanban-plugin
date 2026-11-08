@@ -38,7 +38,7 @@ for (const packaged of [false, true]) {
       args,
       cwd: home,
       env: {
-        HOME: process.env.HOME ?? "",
+        HOME: home,
         PATH: process.env.PATH ?? "",
         CODEX_HOME: home,
         TASKBOARD_WS_URL: `ws://127.0.0.1:${port}`,

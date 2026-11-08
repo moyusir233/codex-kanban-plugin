@@ -11,7 +11,7 @@
     "build": "tsc --noEmit && vite build && tsup",
     "start": "node dist/server/index.js",
     "preview": "node dist/server/preview.js",
-    "test": "tsx --test tests/*.test.ts",
+    "test": "tsx tests/run-fixtures.ts",
     "check": "tsc --noEmit",
     "package:plugin": "npm run build && node scripts/package-plugin.mjs",
     "codex-kanban-plugin": "node scripts/start-live.mjs",

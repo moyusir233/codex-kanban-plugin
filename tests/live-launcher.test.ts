@@ -6,6 +6,7 @@ import { access, mkdtemp, rm } from "node:fs/promises";
 import net from "node:net";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
+import { fixtureEnv } from "./fixture-env";
 
 const cli =
   process.env.TASKBOARD_CODEX_CLI ??
@@ -44,13 +45,12 @@ async function fixture(port: number, mode = "closed", command = cli) {
       resolve("tests/launcher-desktop-fixture.mjs"),
     ],
     {
-      env: {
-        ...process.env,
-        CODEX_HOME: home,
+      env: fixtureEnv(home, {
         TASKBOARD_CODEX_CLI: command,
         TASKBOARD_WS_URL: `ws://127.0.0.1:${port}/`,
         TASKBOARD_TEST_MODE: mode,
-      },
+      }),
+      cwd: home,
       stdio: ["pipe", "pipe", "pipe"],
     },
   );

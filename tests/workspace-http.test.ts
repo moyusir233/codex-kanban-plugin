@@ -8,6 +8,7 @@ import net from "node:net";
 import { basename, join, resolve } from "node:path";
 import { setTimeout } from "node:timers/promises";
 import { once } from "node:events";
+import { fixtureEnv } from "./fixture-env";
 
 test(
   "preview workspaces support persistent edits and reject writes from other pages",
@@ -19,12 +20,11 @@ test(
     const port = (reserve.address() as net.AddressInfo).port;
     await new Promise<void>((ok) => reserve.close(() => ok()));
     const child = spawn(process.execPath, [resolve("dist/server/preview.js")], {
-      env: {
-        ...process.env,
-        CODEX_HOME: home,
+      env: fixtureEnv(home, {
         TASKBOARD_PORT: String(port),
         TASKBOARD_WS_URL: "ws://127.0.0.1:1",
-      },
+      }),
+      cwd: home,
       stdio: ["ignore", "pipe", "pipe"],
     });
     const origin = `http://127.0.0.1:${port}`;

@@ -15,6 +15,7 @@ import { once } from "node:events";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { createInterface } from "node:readline";
+import { fixtureEnv } from "./fixture-env";
 
 for (const desktopPath of [false, true]) {
   test(
@@ -34,7 +35,8 @@ for (const desktopPath of [false, true]) {
       const codexHome = join(temp, "codex");
       await mkdir(codexHome);
       const userHome = join(temp, "user home");
-      let runtimePath = process.env.PATH;
+      await mkdir(userHome);
+      let runtimePath = fixtureEnv(userHome).PATH;
       if (desktopPath) {
         const oldBin = join(temp, "old-system-bin");
         const nvmBin = join(
@@ -53,13 +55,11 @@ for (const desktopPath of [false, true]) {
         await symlink(process.execPath, join(nvmBin, "node"));
         runtimePath = `${oldBin}:/usr/bin:/bin`;
       }
-      const env = {
+      const env = fixtureEnv(userHome, {
         PATH: runtimePath,
-        HOME: desktopPath ? userHome : process.env.HOME,
         CODEX_HOME: codexHome,
         TASKBOARD_WS_URL: "ws://127.0.0.1:1",
-        HTTPS_PROXY: process.env.HTTPS_PROXY,
-      };
+      });
       let child: ReturnType<typeof spawn> | undefined;
       const pending = new Map<
         number,

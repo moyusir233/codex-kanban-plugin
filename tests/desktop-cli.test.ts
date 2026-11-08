@@ -7,6 +7,7 @@ import net from "node:net";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { createInterface } from "node:readline";
+import { fixtureEnv } from "./fixture-env";
 
 const cli =
   process.env.TASKBOARD_CODEX_CLI ??
@@ -122,15 +123,11 @@ for (const packaged of [false, true]) {
         const port = (portServer.address() as net.AddressInfo).port;
         await new Promise<void>((ok) => portServer.close(() => ok()));
         const endpoint = `ws://127.0.0.1:${port}`;
-        const env = {
-          HOME: home,
-          CODEX_HOME: home,
-          PATH: process.env.PATH,
-          CODEX_MCP_NODE_PATH: process.execPath,
+        const env = fixtureEnv(home, {
           TASKBOARD_CODEX_CLI: cli,
           TASKBOARD_WS_URL: endpoint,
           CODEX_APP_TOOLS_PIPE_PATH: pipe,
-        };
+        });
         for (const args of [
           ["plugin", "marketplace", "add", marketplace, "--json"],
           [
@@ -289,15 +286,14 @@ test("desktop CLI version and startup config inspection bypass the live transpor
     return t.skip("Codex CLI not installed");
   }
   const home = await mkdtemp(join(tmpdir(), "taskboard-cli-inspection-"));
-  const env = {
-    ...process.env,
-    CODEX_HOME: home,
+  const env = fixtureEnv(home, {
     TASKBOARD_CODEX_CLI: cli,
     TASKBOARD_WS_URL: "invalid",
-  };
+  });
   try {
     const version = execFileSync("/bin/sh", [wrapper, "--version"], {
       env,
+      cwd: home,
       encoding: "utf8",
       timeout: 10000,
     });
@@ -305,7 +301,7 @@ test("desktop CLI version and startup config inspection bypass the live transpor
     const config = execFileSync(
       "/bin/sh",
       [wrapper, "app-server", "--print-startup-config"],
-      { env, encoding: "utf8", timeout: 10000 },
+      { env, cwd: home, encoding: "utf8", timeout: 10000 },
     );
     assert.ok(JSON.parse(config).appServerVersion);
   } finally {
@@ -324,13 +320,12 @@ test(
     }
     const home = await mkdtemp(join(tmpdir(), "taskboard-cli-auxiliary-"));
     const child = spawn("/bin/sh", [wrapper, "app-server"], {
-      env: {
-        ...process.env,
-        CODEX_HOME: home,
+      env: fixtureEnv(home, {
         TASKBOARD_CODEX_CLI: cli,
         TASKBOARD_WS_URL: "invalid",
         CODEX_INTERNAL_ORIGINATOR_OVERRIDE: "codex_latex_preview",
-      },
+      }),
+      cwd: home,
       stdio: ["pipe", "pipe", "pipe"],
     });
     const finished = once(child, "exit");
