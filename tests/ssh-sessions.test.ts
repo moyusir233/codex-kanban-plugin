@@ -177,9 +177,19 @@ test("SSH display reuses known structured Desktop questions and turn failures, n
   assert.equal(lost.runtime, null);
 });
 
-test("SSH actions require explicit registered pairs and never opt in implicitly", async () => {
+test("SSH actions default to registered pairs only; explicit lists restrict or disable them", async () => {
   const { sshActionTargets } = await import("../server/ssh-sessions");
-  assert.deepEqual(sshActionTargets(undefined, [target]), []);
+  const otherHost = { ...target, hostId: "another" };
+  const registered = [target, otherHost];
+  const defaults = sshActionTargets(undefined, registered);
+  assert.deepEqual(defaults, registered);
+  assert.notEqual(defaults, registered);
+  assert.notEqual(defaults[0], target);
+  assert.deepEqual(sshActionTargets(undefined, []), []);
+  assert.deepEqual(sshActionTargets("[]", registered), []);
+  assert.deepEqual(sshActionTargets(JSON.stringify([target]), registered), [
+    target,
+  ]);
   assert.deepEqual(sshActionTargets(JSON.stringify([target]), [target]), [
     target,
   ]);
@@ -191,4 +201,12 @@ test("SSH actions require explicit registered pairs and never opt in implicitly"
       ]),
     /subset/,
   );
+  for (const value of [
+    "",
+    "invalid",
+    "null",
+    "{}",
+    JSON.stringify([{ ...target, extra: true }]),
+  ])
+    assert.throws(() => sshActionTargets(value, registered));
 });

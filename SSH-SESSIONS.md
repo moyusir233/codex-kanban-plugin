@@ -100,19 +100,33 @@ read and attention filters. Newer local threads cannot evict a disconnected SSH
 candidate. Hidden pages and non-board views still release observation; this is
 not an always-on background watcher or a guarantee that Desktop sends a snapshot.
 
-## Explicit owner-action opt-in (new; not live-tested)
+## Owner actions enabled for registered pairs (not live-tested)
 
-With `TASKBOARD_SSH_ACTIONS` unset, all registrations remain read-only. The new
-variable accepts the same strict JSON pair array as `TASKBOARD_SSH_SESSIONS`,
-must be a subset of it, and defaults to `[]`. This is a process feature opt-in,
-not a Desktop security setting or permission to conduct live testing. No wildcard
-host authorization or automatic target registration exists. Do not add business
-sessions merely to experiment. Source and packaged MCP configs forward it.
+As requested by the user on 2026-11-11, an unset `TASKBOARD_SSH_ACTIONS` now
+enables approval and question-answer controls for the exact pairs explicitly
+configured in `TASKBOARD_SSH_SESSIONS`. No separate action opt-in is required.
+This enables **user-submitted controls**, not automatic approval or replies.
+Adding a remote observation target therefore also enables its supported controls
+once a fresh ordinary loaded snapshot is available.
 
-For opted-in pairs only, the board handles the **same implemented local
+An explicit `TASKBOARD_SSH_ACTIONS` still accepts the same strict JSON pair array,
+must be a subset of registered targets, and replaces the default: use `[]` for
+read-only mode or a smaller list to restrict actions. An invalid value fails
+startup; it never falls back to enabling everything. No registered targets means
+no remote actions. Directory rows and stored collection references do not count
+as registered targets and cannot acquire these capabilities. Source and packaged
+MCP configs forward the optional override.
+
+This is a plugin feature policy, not a Desktop security/permission change or
+authorization for the agent to perform live tests. No wildcard host authorization
+or automatic target registration exists. Do not add business sessions merely to
+experiment. The existing installed plugin/configuration is not changed by this
+source update.
+
+For enabled pairs, the board handles the **same implemented local
 confirmation kinds**: command decisions, file-change decisions with observed
 previews, structured answers and async question replies. Async replies can start
-or steer a turn through the current owner: this opt-in explicitly enables
+or steer a turn through the current owner: enabling these controls permits
 execution of submitted answers. No general send/resume, interrupt, settings,
 permissions-change or arbitrary RPC tool is added.
 
@@ -124,7 +138,7 @@ expected method/owner. Revision churn fails closed and may require refreshing,
 never automatic action retry. Reply IDs, confirmations and pending IPC are
 host-scoped. Disconnect, owner loss, unsubscribe, patch gaps, cache restoration
 and unknown runtime remove capabilities; only a live replacement can restore
-them. The UI labels the host and action opt-in.
+them. The UI labels the host and whether actions are enabled or read-only.
 
 Acknowledgement is not completion: the existing removal/answer-echo check is
 retained. Duplicate clicks cannot resubmit the same request. Timeout/uncertainty
@@ -137,8 +151,8 @@ remote cwd is read locally, including workspace roots in submitted answers.
 When the already-received snapshot includes the known Desktop turn-history
 shape, the mapper reuses the local structured-question parser for a short
 unanswered-question title and the latest failed-turn marker. It does not fetch
-history. Approval payloads and controls require the separate explicit action
-opt-in above. Missing
+history. Approval payloads and controls follow the registered-pair action policy
+and live-state checks above. Missing
 or malformed history is not proof that there are no questions. No waiting-start
 timestamp, user-message timestamp, usage or free-form assistant text is invented.
 Question/error display is cleared on snapshot loss. Validated snapshot-only
@@ -202,7 +216,7 @@ collections should use this fork rather than an older installed package.
 | Collections | Existing plugin-owned records | Host-scoped association, picker, tags and search |
 | Open session | Existing local deep link | Disabled: known resume/ownership/read/auto-response risks; installed compatibility unverified |
 | Discovery | Existing local index/listing | Optional expiring configured-host history directory via verified native route; no automatic connected-host discovery or automatic snapshot registration |
-| Approvals/answers/execution | Existing local controls | Default denied; explicit per-pair opt-in uses current owner, fixture-tested only |
+| Approvals/answers/execution | Existing local controls | Enabled by default for explicitly registered pairs; optional restrictive override; current-owner checks, fixture-tested only |
 | Turn timing | Existing local sources | Validated fields from received snapshot only; cleared on loss |
 | Wait relationships | Existing local monitoring | Successful latest-turn snapshot evidence between registered live SSH cards only; no active-watcher claim or navigation |
 | Saved thread Git metadata | Existing local behavior | Validated branch/commit fields from received snapshot; not current Git/worktree status |
@@ -228,11 +242,13 @@ collections should use this fork rather than an older installed package.
 
 ## Safety and unfinished work
 
-- Remote approval/reply execution is default denied and requires explicit
-  per-pair process opt-in. Resume, ownership acquisition and unverified
+- Remote approval/reply controls default to the explicitly registered pairs;
+  requests still require a user submission and current owner/lifetime checks.
+  Use an explicit empty action list for read-only acceptance. General resume,
+  ownership acquisition and unverified
   navigation remain unavailable. Packaging does not perform installation or actions.
 - Remote cards are excluded from local Git reads, artifacts and navigation links.
-  Default read-only registrations do not expose actionable approval payloads.
+  Explicit read-only registrations do not expose actionable approval payloads.
   Existing local operations stay unchanged.
 - No remote history fetching, last-user-message time, token usage, current Git
   filesystem inspection or artifacts. Saved thread Git metadata is snapshot-only.
@@ -250,7 +266,9 @@ collections should use this fork rather than an older installed package.
   attention filters, project/title filters, owner loss and transport reconnect.
   Collection fixtures exercise real UI/MCP writes to temporary plugin data,
   identical local/remote IDs and multiple-host persistence isolation.
-  Action fixtures additionally cover MCP startup allowlists, built UI decisions,
+  Action fixtures additionally cover default-enabled registration and explicit
+  read-only overrides through the actual source/distribution startup configs,
+  no automatic submissions, built UI decisions,
   wire versions, same-ID hosts, owner/revision races, legacy relay denial, async
   start/steer and duplicates. Navigation fixtures cover manual remote link denial,
   duplicate/encoded route keys, absence of a navigable href, side-effect warnings
@@ -271,7 +289,8 @@ First verify the tested source/repository build ID, not just the plugin version.
 The existing Mac installation and its plugin-specific Node 24 configuration are
 untouched and still run their installed bytes. Any separate installation/update
 or live disconnect/navigation test needs its own user-controlled acceptance.
-Using only the named test session, start with a visible, read-only board check of
+Using only the named test session and an explicit `TASKBOARD_SSH_ACTIONS='[]'`
+override, start with a visible, read-only board check of
 title/model/unread and disabled action/navigation controls. Do not send a message
 or resume a thread to obtain metadata. Then, if separately authorized, verify a
 disconnect/reconnect with 15+ local candidates and running/attention filters;

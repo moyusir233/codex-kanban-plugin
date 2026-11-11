@@ -20,7 +20,7 @@
       "startup_timeout_sec": 180,
       "tool_timeout_sec": 60,
       "env": {
-        "TASKBOARD_BUILD_ID": "c7541a6898fa9b95313d2f5e28d9a2f0dc143379d63dcd7205d99e4ced2bbd79"
+        "TASKBOARD_BUILD_ID": "24f229d70b20444f207514f05fb9ae12f8b03447d3cfe8fe6e9f40bf4bee7c54"
       }
     }
   }

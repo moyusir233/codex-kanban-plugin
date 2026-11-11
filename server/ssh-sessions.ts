@@ -39,7 +39,9 @@ export function sshSessionTargets(value: string | undefined): SessionTarget[] {
   ];
 }
 
-/** Actions never register new observation targets or grant access to a whole host. */
+/** Registered pairs enable user-submitted actions by default; an explicit list
+ * restricts them (including [] for read-only). Never register new targets or
+ * grant access to a whole host. */
 export function sshActionTargets(
   value: string | undefined,
   registered: SessionTarget[],
@@ -49,7 +51,10 @@ export function sshActionTargets(
       sessionKey({ id: target.threadId, hostId: target.hostId }),
     ),
   );
-  const actions = sshSessionTargets(value);
+  const actions =
+    value === undefined
+      ? registered.map((target) => ({ ...target }))
+      : sshSessionTargets(value);
   if (
     actions.some(
       (target) =>

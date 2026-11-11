@@ -52719,7 +52719,7 @@ function sshActionTargets(value, registered) {
       (target) => sessionKey({ id: target.threadId, hostId: target.hostId })
     )
   );
-  const actions = sshSessionTargets(value);
+  const actions = value === void 0 ? registered.map((target) => ({ ...target })) : sshSessionTargets(value);
   if (actions.some(
     (target) => !allowed.has(
       sessionKey({ id: target.threadId, hostId: target.hostId })

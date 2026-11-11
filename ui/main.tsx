@@ -1184,7 +1184,7 @@ function ThreadCard({
             {!local && (
               <span className="card-branch">
                 {thread.hostId} ·{" "}
-                {thread.remoteActionsEnabled ? "Actions opted in" : "Read-only"}
+                {thread.remoteActionsEnabled ? "Actions enabled" : "Read-only"}
               </span>
             )}
             <span className="card-project" title={thread.cwd}>

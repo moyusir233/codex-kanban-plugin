@@ -132,8 +132,10 @@ and `thread-owner-discovery`:
 6. bootstrap854 dispatches approvals, user-input, start and steer to the existing
    owner's methods. No second SSH app-server or ownership acquisition is needed.
 
-This fork implements this route for the existing local confirmation UI behind
-explicit registered-pair opt-in. No startup action probe, automatic execution or
+This fork implements this route for the existing local confirmation UI, scoped
+to explicitly registered pairs. Since the user's 2026-11-11 policy change these
+pairs enable the controls by default; `TASKBOARD_SSH_ACTIONS` can still restrict
+them or disable them with `[]`. No startup action probe, automatic execution or
 retry, arbitrary RPC relay or unsolicited action is added. Targeted discovery
 happens only after submission; owner, revision, connection and pair are rechecked.
 Local envelopes and omitted-host replies keep their existing behavior.
@@ -536,7 +538,8 @@ history read or free-form message extraction was added; these fields stay unknow
 
 Reuse the Desktop-owned host services, not a competing backend:
 
-- **Implemented:** default-denied host-scoped existing confirmation/answer UI,
+- **Implemented:** registered-pair-scoped existing confirmation/answer UI,
+  default-enabled per the user's 2026-11-11 request, with optional restrictive overrides,
   exact wire versions, owner/revision/connection verification, stale/duplicate
   handling, MCP environment forwarding and source/distribution UI fixtures.
 - **Already implemented:** explicit observation, non-live filtering metadata
@@ -567,4 +570,4 @@ that gap.
 Remote operations have not been tested live. Separate explicit authorization for
 the named test session is needed. Fixtures do not establish support in every
 Desktop version or for disconnected/unloaded owners. The private protocol may
-change; default read-only is the starting point for acceptance.
+change; use an explicit empty action-list override for read-only acceptance.

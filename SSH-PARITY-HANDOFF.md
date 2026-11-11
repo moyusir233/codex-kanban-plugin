@@ -1,5 +1,16 @@
 # Continue the Kanban SSH/local capability-parity implementation
 
+**User policy update — 2026-11-11:** the user explicitly requested that remote
+approval and question-answer controls be enabled by default. This supersedes the
+original default-disabled action requirement: an unset `TASKBOARD_SSH_ACTIONS`
+now enables controls for the exact registered `TASKBOARD_SSH_SESSIONS` pairs only.
+An explicit action list restricts that set; `[]` requests read-only mode. Owner,
+host/thread, freshness, original-request and duplicate checks remain mandatory.
+Controls never auto-submit, and this code change is not authorization for live
+approvals, answers, installation or navigation. Navigation remains unchanged.
+The remaining original handoff is retained as historical context; see
+`SSH-SESSIONS.md` for current configuration semantics.
+
 Use this document as the task prompt for a new coding-agent session on the
 machine that actually runs Codex/ChatGPT Desktop. It is a user-level handoff,
 not a replacement for that environment's system/developer instructions or
@@ -149,9 +160,10 @@ live-mutation authorization has been supplied in this prompt.
    installation, restart, disconnect, navigation, ownership/read-state changes,
    or other new side effects requires a specific approval/rollback plan first.
    The availability of a complete environment alone does not grant that approval.
-5. Keep remote approvals, execution, resume, and unverified navigation disabled
-   by default. Authorize test actions per exact host/thread pair, never a wildcard
-   or all business sessions. A test opt-in does not change production defaults.
+5. Approval/answer controls follow the user-requested registered-pair default
+   described above; general resume and unverified navigation remain disabled.
+   Start live acceptance with an explicit empty action list. Authorize test actions
+   per exact host/thread pair, never a wildcard or all business sessions.
    Send only harmless agreed test content/commands into dedicated temporary test
    workspaces; obtain confirmation of possible model/usage costs. Do not replay
    timed-out writes: reconcile with the original test conversation first.
@@ -190,8 +202,9 @@ information/authorization; continue safe independent preparation while waiting.
 - Identity uses `ssh:` plus `JSON.stringify([hostId, threadId])`; local UUID
   keys stay unchanged. Plugin-owned collections support SSH references without
   registering/resuming them, and exclude all `ssh:` keys from local readers.
-- `TASKBOARD_SSH_ACTIONS` is the same strict pair array, a subset of observation
-  targets, default empty. It enables the existing confirmation/answer UI only
+- `TASKBOARD_SSH_ACTIONS` is an optional strict pair-array override, a subset of
+  observation targets. Unset enables registered pairs; `[]` makes them read-only.
+  The policy enables the existing confirmation/answer UI only
   for fresh ordinary loaded snapshots. Targeted owner discovery, wire versions,
   owner/revision/connection rechecks and duplicate prevention fail closed. Async
   replies can start/steer a turn; that is execution, not a harmless read. The
@@ -218,8 +231,9 @@ For a newly designated test pair, process-local configuration has this shape:
 
 ```sh
 TASKBOARD_SSH_SESSIONS='[{"hostId":"<actual-desktop-host-id>","threadId":"<new-disposable-thread-id>"}]'
-# Leave TASKBOARD_SSH_ACTIONS unset for the initial read-only check.
+TASKBOARD_SSH_ACTIONS='[]' # Explicit read-only override for initial acceptance.
 # Only after an approved action plan, set it to the approved subset of pairs.
+# For ordinary use, omitting it enables controls for all registered pairs.
 ```
 
 Use exact JSON without the explanatory placeholders when launching a verified

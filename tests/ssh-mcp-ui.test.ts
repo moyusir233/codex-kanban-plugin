@@ -44,8 +44,8 @@ for (const { packaged, actions } of [
 ]) {
   test(
     (packaged ? "repository distribution" : "source build") +
-      " MCP/UI observes SSH through filtered reconnects and host-safe collections; actions=" +
-      actions,
+      " MCP/UI observes SSH through filtered reconnects and host-safe collections; action policy=" +
+      (actions ? "default-enabled" : "explicit-read-only"),
     { timeout: 60000 },
     async (t) => {
       const home = await mkdtemp(join(tmpdir(), "kanban-ssh-ui-"));
@@ -278,11 +278,9 @@ for (const { packaged, actions } of [
           { hostId: monitorHost, threadId: monitorId },
         ]),
       };
-      if (actions)
-        supplied.TASKBOARD_SSH_ACTIONS = JSON.stringify([
-          { hostId, threadId: id },
-        ]);
-      // Model the executor allowlist; never hand-inject the opt-in into transport.env.
+      if (!actions) supplied.TASKBOARD_SSH_ACTIONS = "[]";
+      // Model the executor allowlist. Enabled cases deliberately omit the action
+      // variable to exercise the real startup default, not a fixture-only opt-in.
       const env: Record<string, string> = Object.fromEntries(
         config.env_vars
           .filter((key: string) => key in supplied)
@@ -691,6 +689,16 @@ for (const { packaged, actions } of [
         );
         if (actions) {
           await until(() => !!remoteCard().querySelector(".card-confirmation"));
+          assert.ok(remoteCard().textContent?.includes("Actions enabled"));
+          assert.equal(
+            messages.some(
+              (m) =>
+                m.method === "thread-owner-discovery" ||
+                m.method === "thread-follower-command-approval-decision",
+            ),
+            false,
+            "Default-enabled controls must not submit or discover an action owner before a user click",
+          );
           assert.ok(
             remoteCard()
               .querySelector(".card-confirmation")!

@@ -37,7 +37,7 @@ export type Thread = {
   hostId?: string;
   /** Remote sessions have no implicit execution or navigation capabilities. */
   observationOnly?: boolean;
-  /** Explicit per-pair opt-in, valid only for the current live snapshot. */
+  /** Registered-pair action policy, valid only for the current live snapshot. */
   remoteActionsEnabled?: boolean;
   title: string;
   cwd: string;

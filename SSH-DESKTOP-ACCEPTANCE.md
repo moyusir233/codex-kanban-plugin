@@ -4,6 +4,12 @@ This is a follow-up to [the handoff](SSH-PARITY-HANDOFF.md), not a full-parity
 completion report. Real disposable target identifiers are kept in the local,
 ignored acceptance record rather than published as fixtures.
 
+**2026-11-11 update:** Desktop is now 26.1103.60933 / build 25894, with a different
+ASAR fingerprint. The directory adapter still admits only the reviewed earlier
+fingerprint and correctly refuses this version. The environment and live results
+below describe the 2026-11-08 milestone, not live acceptance of the updated app.
+See the final section for the action-default change and current regression result.
+
 ## Established environment
 
 | Component | Verified value |
@@ -309,7 +315,7 @@ The detailed local/SSH baseline remains in [SSH-SESSIONS.md](SSH-SESSIONS.md).
 | Metadata/state/filter recovery | Synthetic MCP/UI tests; after authorized open, exact-pair source/distribution MCP received v11 snapshots, renewed freshness and cleared it on release | Broader live state/filter lifecycle and installed UI acceptance |
 | Model/mode/goal/unread/questions | Live idle/model/unread observed for one loaded pair; title remains unknown; synthetic supported-field mapping | Broader live lifecycle/fields; read-state side effects of open kept separate from observation |
 | Usage/input/timing/history | Existing bounded snapshot semantics; unknown data stays unknown | Verified host service for missing fields, current-version live evidence |
-| Existing approval/answer kinds | Per-pair default denial and owner/lifetime fixtures | Separate exact-pair action plan and original-request completion evidence |
+| Existing approval/answer kinds | Since the 2026-11-11 user request, controls default to registered pairs; explicit read-only override and owner/lifetime fixtures retained | Separate exact-pair live action plan and original-request completion evidence |
 | Session/artifact navigation | Existing denial retained | Installed route effects and separate navigation approval |
 | Current Git/artifacts/review | No remote path reaches a local reader | Correct-host export and authorized live test workspace reads |
 | Collections/monitoring | Synthetic host isolation, persistence and stale clearing | Real plugin-route acceptance at separately authorized scope |
@@ -319,7 +325,7 @@ A real narrow routed directory adapter is now implemented and its primitive was
 verified live. This does not claim a complete generic host-service export, normal
 UI live acceptance or full SSH capability parity.
 
-## Distribution provenance
+## Distribution provenance — directory milestone (2026-11-08)
 
 - Build ID: `c7541a6898fa9b95313d2f5e28d9a2f0dc143379d63dcd7205d99e4ced2bbd79`
 - Runtime server SHA256: `d2455f2b5fef1bc4d451d6f202e1e96bd411806f4b592f98314f3a8673e9ba64`
@@ -349,9 +355,64 @@ UI live acceptance or full SSH capability parity.
 - Implementation and regenerated distribution are committed as `ef0e52c`
   (`feat(ssh): add scoped Desktop host directory via native services`) on
   `feat/ssh-session-observer`; this report records the completed regression
-  separately. Only this acceptance report changed after that final full run;
-  runtime bytes and the build ID above remain unchanged.
+  separately. At that delivery only this acceptance report changed after the
+  final full run; its runtime bytes and build ID are recorded above. The later
+  action-default update has separate provenance below.
 
 Repository distribution and offline ZIP are build outputs, not an installed
 Kanban update. Temporary probe/marketplace removal has completed; no installation
 or lifecycle rollback is pending. Test conversations and reports are retained.
+
+## User-requested approval/answer default — 2026-11-11
+
+The user explicitly requested enabled-by-default remote approval and question
+answering. An unset `TASKBOARD_SSH_ACTIONS` now takes the exact registered
+`TASKBOARD_SSH_SESSIONS` pairs, not an empty list. An explicit subset still
+restricts them; `[]` explicitly selects read-only mode. Malformed overrides fail
+startup. No registrations means no remote actions; directory rows and collection
+references do not add registrations or action permissions.
+
+This enables controls, not automatic approvals, automatic answers or arbitrary
+execution. The current host/thread, owner, snapshot revision, ordinary loaded
+state, offered decision, original request, answer validation, duplicate and
+completion/echo checks are unchanged. Disconnect, owner loss and stale/cache
+state still revoke controls. The UI label now says `Actions enabled`, not
+`Actions opted in`.
+
+Navigation is unchanged. Desktop's host-qualified SSH links are supported and
+one previously authorized exact-pair open already succeeded, as recorded above.
+The plugin's denial is the earlier read-only product boundary, not evidence of
+missing Desktop link support. The user asked why navigation was disabled; this
+change does not infer authorization to open a live session or change navigation.
+
+Focused regressions passed **77 tests, no failures/cancellations/skips**, including
+default-enabled approvals, structured/async questions, explicit read-only and
+subset overrides, no automatic submission, stale/owner/cross-host checks and
+unchanged navigation denial. The existing source/distribution MCP/UI cases now
+exercise both an **omitted** action variable (default-enabled) and explicit `[]`
+(read-only), rather than injecting an opt-in for the enabled cases.
+
+- Build ID: `24f229d70b20444f207514f05fb9ae12f8b03447d3cfe8fe6e9f40bf4bee7c54`
+- Runtime server SHA256: `70786d30ce74d383b835bb30ab9f3290ed76bcad8a83d36f7d32aaf48d2a9f48`
+- Runtime UI SHA256: `fd19bcce8ee9b884e42bbe6cd360895eb6de890141a12c66fc5185e2d0fb920f`
+- `npm run check` and `npm run package:plugin` pass; source, tracked distribution
+  and offline artifacts were regenerated together.
+- Standalone package provenance and `git diff --check` pass.
+- Full `npm test`: **312 pass / 2 fail / 0 cancelled / 0 skipped**,
+  `duration_ms=186143.964875`. All four source/distribution SSH MCP/UI cases pass,
+  covering default-enabled and explicit read-only policy, actual UI submission
+  through synthetic owner transport, stale rejection and local compatibility.
+- The two failures are the unchanged source/distribution **directory** MCP/UI
+  fixtures: `desktop-protocol-unverified`, **zero native requests**. Exact
+  application inspection found Desktop **26.1103.60933 / build 25894**, ASAR SHA256
+  `a77588b2dcfa9b394d722dd8c2c8b13d3a09bacd49c839cc715245742dba6048`,
+  instead of the reviewed `766faa8a...` fingerprint. The action-policy change does
+  not modify the directory adapter or its test; this is an environment/version
+  admission blocker, not a newly admitted protocol or directory regression fix.
+  The pinned fingerprint and failing tests were not relaxed, replaced or skipped.
+  Directory support on the updated Desktop needs separate protocol review.
+
+No installed-plugin/configuration edit, Desktop restart, live approval, question
+reply, directory read or navigation was performed for this policy change.
+Remote action completion and normal installed UI acceptance remain unfinished;
+changing the default is not additional live evidence or full SSH parity.

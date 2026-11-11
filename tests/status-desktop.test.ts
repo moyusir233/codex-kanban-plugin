@@ -20,7 +20,7 @@ async function until(check: () => Promise<boolean>) {
 }
 
 /** 以隔离桌面 socket 验证默认接入，不启动 Codex、不执行回合或真实审批。 */
-async function fixture(sshSessions?: string) {
+async function fixture(sshSessions?: string, sshActions?: string) {
   const home = await mkdtemp(join(tmpdir(), "kanban-desktop-state-"));
   await mkdir(join(home, "ipc"));
   const database = new DatabaseSync(join(home, "state_5.sqlite"));
@@ -103,7 +103,7 @@ async function fixture(sshSessions?: string) {
   await new Promise<void>((ok) =>
     server.listen(join(home, "ipc", "ipc.sock"), ok),
   );
-  const bridge = new StatusBridge({ home, sshSessions });
+  const bridge = new StatusBridge({ home, sshSessions, sshActions });
   bridge.start();
   return {
     bridge,
@@ -472,9 +472,100 @@ for (const status of ["completed", "interrupted", "failed"]) {
   });
 }
 
-test("explicit SSH targets stay unknown until observed and never enter local enrichment or approvals", async () => {
-  const hostId = "fixture-remote";
+test("registered SSH pairs expose approvals and question answers by default only while live, without automatic submission", async () => {
+  const hostId = "fixture-default-actions";
   const f = await fixture(JSON.stringify([{ hostId, threadId: id }]));
+  const remote = async () =>
+    (await f.bridge.snapshot()).threads.find(
+      (thread) => thread.hostId === hostId,
+    )!;
+  try {
+    await f.bridge.open();
+    assert.equal((await remote()).remoteActionsEnabled, false);
+    await until(async () =>
+      f.messages.some((m) => m.params?.hostId === hostId && m.params.following),
+    );
+    const state = {
+      ...f.state(),
+      threadRuntimeStatus: { type: "idle" },
+      turns: [
+        {
+          turnId: "remote-question-turn",
+          status: "completed",
+          items: [
+            {
+              id: "async-question",
+              type: "agentMessage",
+              questions: [{ title: "Fixture async answer?" }],
+            },
+          ],
+        },
+      ],
+      requests: [
+        {
+          id: 0,
+          method: "item/commandExecution/requestApproval",
+          params: {
+            threadId: id,
+            command: "FIXTURE_NOT_EXECUTED",
+            availableDecisions: ["accept", "decline"],
+          },
+        },
+        {
+          id: 1,
+          method: "item/tool/requestUserInput",
+          params: {
+            threadId: id,
+            questions: [
+              { id: "q", question: "Fixture structured answer?", options: [] },
+            ],
+          },
+        },
+      ],
+    };
+    f.snapshot(state, hostId);
+    await until(async () => (await remote()).remoteActionsEnabled === true);
+    assert.equal((await remote()).observationOnly, false);
+    const data = await f.bridge.snapshot();
+    assert.deepEqual(
+      data.confirmations?.requests.map((request) => request.kind).sort(),
+      ["asyncUserInput", "command", "userInput"],
+    );
+    assert.ok(
+      data.confirmations?.requests.every(
+        (request) => request.threadId === id && request.hostId === hostId,
+      ),
+    );
+    assert.deepEqual(
+      [
+        ...new Set(
+          f.messages.filter((m) => m.type === "request").map((m) => m.method),
+        ),
+      ],
+      ["initialize"],
+    );
+    for (const unavailable of [
+      { ...state, source: { subAgent: { parentThreadId: id } } },
+      { ...state, threadRuntimeStatus: { type: "notLoaded" } },
+    ]) {
+      f.snapshot(unavailable, hostId);
+      await until(async () => (await remote()).remoteActionsEnabled === false);
+      assert.deepEqual((await f.bridge.snapshot()).confirmations?.requests, []);
+      f.snapshot(state, hostId);
+      await until(async () => (await remote()).remoteActionsEnabled === true);
+    }
+    f.disconnect();
+    await until(async () => (await remote()).fresh === false);
+    assert.equal((await remote()).remoteActionsEnabled, false);
+    assert.deepEqual((await f.bridge.snapshot()).confirmations?.requests, []);
+  } finally {
+    await f.close();
+  }
+});
+
+test("explicit read-only SSH targets stay unknown until observed and never enter local enrichment or approvals", async () => {
+  const hostId = "fixture-remote";
+  const f = await fixture(JSON.stringify([{ hostId, threadId: id }]), "[]");
   const readCwds: string[] = [];
   (f.bridge as any).gitMetadata = {
     read: async (cwd: string) => {

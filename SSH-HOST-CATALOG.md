@@ -88,9 +88,13 @@ an authorized turn. Use the actual discovered qualified callable path for deferr
 tools. Preview HTTP/WebSocket has no native catalog fallback.
 
 Without the grant the tool is not registered; the existing local board, omitted
-host/schema-v1 handling and explicit SSH observer/action opt-ins remain unchanged.
+host/schema-v1 handling and the separately configured SSH observer/action policy
+remain independent of directory grants.
 Directory grants do not add entries to `TASKBOARD_SSH_SESSIONS` or
-`TASKBOARD_SSH_ACTIONS` and never enable navigation.
+`TASKBOARD_SSH_ACTIONS` and never enable navigation. The 2026-11-11 policy change
+enables user-submitted approval/answer controls for explicitly registered pairs
+by default; directory rows are not registrations and do not gain those controls.
+An explicit `TASKBOARD_SSH_ACTIONS='[]'` still requests read-only mode.
 
 The underlying adapter passed a live one-host, ten-row test through the temporary
 ordinary plugin, which was removed afterward. Source and distribution MCP/UI
