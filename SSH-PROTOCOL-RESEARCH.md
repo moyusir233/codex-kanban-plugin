@@ -1,5 +1,68 @@
 # Desktop SSH parity research — 2026-11-07
 
+## Automatic import follow-up — 2026-11-11 (static only; not implemented)
+
+The user clarified that installation followed by manual SSH links is not the
+desired feature: the board should automatically import Desktop's existing SSH
+sessions. The current `0.2.5` / `8204812` installation does **not** do that.
+An explicitly configured, expiring directory page is not automatic import, and
+removing its opt-in or fingerprint guard would not supply the missing route.
+
+The actually installed app is now **26.1103.60933 / build 25894**, ASAR SHA256
+`a77588b2dcfa9b394d722dd8c2c8b13d3a09bacd49c839cc715245742dba6048`.
+Only application code was inspected: no business directory, session store,
+credentials, native pipe, live host or conversation was queried. Extracted
+entries were checked against ASAR whole-file and block integrity metadata.
+Private extraction/evidence lives under ignored `work/desktop-autoload-20261111/`.
+
+| Entry | SHA256 | Relevant static finding |
+| --- | --- | --- |
+| `webview/assets/async/497066.82fad48b12.js` | `2ba588450e9173dded25dca0163c917f5375237f868f3cdf82df3e488462946f` | Byte-identical listing handler; `case f.cq`, `case A.En`, `tA`, `tO`, `tk`, `tS` |
+| `webview/assets/async/182735.7f13786b92.js` | `119afcc814fe83e733d5b494d3201afe203c51b8d059998b2a8dbf3ed03ccd85` | Tool schemas, execution admission and native-call claim |
+| `.vite/build/early-bootstrap-815-e030c49be4b9c405.js` | `67c10f58239453fba595f83917fda3756ac2f40ef87fe5f70dd143d4ecef6ad1` | Native protocol registration, `callMcpTool`, `_P.tryClaimExecution` |
+| `webview/assets/async/63396.ec0c2499c7.js` | `4b82dc6a50234aa59dadd58e21e335cf333ab6b473163575d0f3c42b442a0412` | MCP App `i3` tool-call forwarding |
+
+Concrete boundaries before choosing an importer:
+
+1. `list_hosts` still enumerates **enabled configured** hosts and fetches their
+   approved workspace roots. Its `{currentHostId, hosts}` result has no established
+   connected-only status. It is not a verified passive connected-host export.
+2. `list_threads` **history** mode still requires a selected host (otherwise it
+   defaults to the caller/local host). `tO` checks connected state/client before
+   exact-host `thread/list`. This remains a narrow building block, not automatic
+   host discovery. The native projection's `kind: "codex"` does not by itself
+   establish ordinary-vs-subagent classification for automatic board promotion.
+3. `list_threads` **recent** mode calls `tA`, which queries connected Codex hosts,
+   local/pinned state **and ChatGPT**; its source/host options are not applied as
+   remote-only filters in this branch. Missing pinned metadata can cause
+   cross-manager `getThreadListSummary` / `readThread(includeTurns:false)` reads.
+   Filtering returned rows cannot undo those broader reads. Replacing the strict
+   history call with recent mode is not a scope-preserving fix.
+4. The inspected MCP App forwarding passes `threadId` and existing `_meta` to
+   `callMcpTool`. It does not itself add native executor turn/call identities.
+   Whether a real board callback receives those from another layer remains
+   **unverified**, not guaranteed by fixtures that inject synthetic metadata.
+   A background refresh cannot borrow an earlier model turn or invent IDs.
+5. Native execution claims the tuple `(hostId, threadId, turnId, callId)` once:
+   `_P.tryClaimExecution` rejects a repeated claim. A multi-step host-list/page
+   importer therefore cannot assume it may replay one real invocation as several
+   native tool executions. JSON-RPC request IDs and executor call identities are
+   different things. Valid context/subcall semantics need a verified route.
+
+No scope-correct automatic-import transport has been established by this static
+follow-up. A usable solution still needs verified connected-host enumeration,
+host-scoped ordinary-session listing and legitimate board/executor integration,
+then automatic board registration/subscription with bounded lifecycle behavior.
+Do not implement inert success scaffolding, bypass native trust/version checks,
+read restricted catalog caches, attach a trusted renderer or start a competing
+SSH backend to conceal that missing prerequisite. Installation and per-thread
+manual registration remain insufficient acceptance. Live catalog scope must be
+agreed before testing; no such broader read was performed in this follow-up.
+
+The earlier research below is historical evidence. Its absence-of-installed-app
+statements and reviewed fingerprint describe their recorded date, not the
+current environment.
+
 **Installed-environment follow-up (2026-11-08):** the actual macOS Desktop
 26.1103.41825 / 25679 ASAR matches the SHA256 below. Earlier statements about
 the absent Desktop describe the original research environment. See

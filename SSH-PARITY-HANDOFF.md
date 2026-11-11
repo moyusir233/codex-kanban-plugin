@@ -1,5 +1,18 @@
 # Continue the Kanban SSH/local capability-parity implementation
 
+**User acceptance clarification — 2026-11-11:** manually supplying SSH links or
+`TASKBOARD_SSH_SESSIONS` does not meet the user's feature expectation. Automatic
+import is a core unfinished requirement, not an optional directory enhancement.
+The working target is: opening the board discovers Desktop's existing connected
+SSH hosts and imports their ordinary session metadata without per-thread setup,
+with host-scoped identity, explicit unavailable/unknown states and no automatic
+open/resume/approval. Reuse Desktop's existing backend. Do not call a manual
+registration flow, an isolated directory page, an installed package or synthetic
+fixtures successful acceptance of automatic import. See the 2026-11-11 static
+findings in `SSH-PROTOCOL-RESEARCH.md`; no automatic-import route is implemented
+or live-accepted yet. Do not silently update the user's installed plugin or read
+business-session catalogs merely to test a proposed route.
+
 **User policy update — 2026-11-11:** the user explicitly requested that remote
 approval and question-answer controls be enabled by default. This supersedes the
 original default-disabled action requirement: an unset `TASKBOARD_SSH_ACTIONS`

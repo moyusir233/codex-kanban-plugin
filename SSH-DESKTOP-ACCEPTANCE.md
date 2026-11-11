@@ -416,3 +416,31 @@ No installed-plugin/configuration edit, Desktop restart, live approval, question
 reply, directory read or navigation was performed for this policy change.
 Remote action completion and normal installed UI acceptance remain unfinished;
 changing the default is not additional live evidence or full SSH parity.
+
+## Automatic import expectation — 2026-11-11, not delivered
+
+The user requested direct installation for Desktop experience, then clarified
+that manually sending SSH links does not meet their expectation: SSH sessions
+should be imported automatically. The authorized installation of `8204812`
+preserved the existing Node 24 runtime and plugin selector, verified installed
+runtime/UI bytes and rehearsed rollback in an isolated profile. It did not
+migrate the historically excluded test target, leaving zero configured remote
+targets. Its private receipt is under ignored
+`work/plugin-install-8204812-20261111-440c1ab1/`. This establishes installation,
+not SSH visibility, automatic import or installed UI acceptance.
+
+Automatic import remains a core unfinished gate. The expected experience is
+opening the board without per-thread setup, discovering Desktop's existing
+connected SSH hosts and importing their ordinary sessions as host-scoped cards.
+Missing runtime stays unknown; import itself must not open/resume, acquire
+ownership, mark read, approve or answer. Native approvals/answers remain explicit
+user submissions. Disconnect/reconnect, pagination, new-session refresh and local
+compatibility need actual plugin-route acceptance, not directory-only fixtures.
+
+Current-version static follow-up is recorded at the start of
+`SSH-PROTOCOL-RESEARCH.md`. It did not establish a scope-correct automatic-import
+entrypoint: configured-host listing is not connected-host discovery, recent-mode
+listing has broader local/ChatGPT/pinned reads, and legitimate UI invocation
+context/subcall semantics remain unresolved. No source/runtime change, installed
+configuration edit or new live catalog/session operation was performed for this
+follow-up. Do not present manual registration as completion of this requirement.
